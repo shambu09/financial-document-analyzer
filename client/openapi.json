@@ -1,0 +1,1867 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+      "title": "Financial Document Analyzer API",
+      "description": "FastAPI application with JWT auth, document management, and CrewAI agents",
+      "version": "2.0.0"
+    },
+    "paths": {
+      "/auth/register": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Register User",
+          "description": "Register a new user",
+          "operationId": "register_user_auth_register_post",
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCreate"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "201": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/login": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Login User",
+          "description": "Login user and return JWT tokens",
+          "operationId": "login_user_auth_login_post",
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLogin"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/LoginResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/refresh": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Refresh Token",
+          "description": "Refresh access token using refresh token",
+          "operationId": "refresh_token_auth_refresh_post",
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshTokenRequest"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/LoginResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/logout": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Logout User",
+          "description": "Logout user and revoke all sessions",
+          "operationId": "logout_user_auth_logout_post",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/auth/me": {
+        "get": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Get Current User Info",
+          "description": "Get current user information",
+          "operationId": "get_current_user_info_auth_me_get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "put": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Update User Info",
+          "description": "Update current user information",
+          "operationId": "update_user_info_auth_me_put",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "username",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Username"
+              }
+            },
+            {
+              "name": "email",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Email"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/change-password": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Change Password",
+          "description": "Change user password",
+          "operationId": "change_password_auth_change_password_post",
+          "requestBody": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangeRequest"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/auth/users": {
+        "get": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Get All Users",
+          "description": "Get all users (admin only)",
+          "operationId": "get_all_users_auth_users_get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "items": {
+                      "$ref": "#/components/schemas/UserResponse"
+                    },
+                    "type": "array",
+                    "title": "Response Get All Users Auth Users Get"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/auth/users/{user_id}": {
+        "delete": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Delete User",
+          "description": "Delete a user (admin only)",
+          "operationId": "delete_user_auth_users__user_id__delete",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "user_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "integer",
+                "title": "User Id"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/auth/cleanup-sessions": {
+        "post": {
+          "tags": [
+            "authentication"
+          ],
+          "summary": "Cleanup Expired Sessions",
+          "description": "Clean up expired sessions (admin only)",
+          "operationId": "cleanup_expired_sessions_auth_cleanup_sessions_post",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/documents/": {
+        "get": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "List Documents",
+          "description": "List documents for the current user with optional search",
+          "operationId": "list_documents_documents__get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "q",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Q"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/DocumentMetadata"
+                    },
+                    "title": "Response List Documents Documents  Get"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/documents/upload": {
+        "post": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Upload Document",
+          "description": "Upload a new document",
+          "operationId": "upload_document_documents_upload_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_upload_document_documents_upload_post"
+                }
+              }
+            },
+            "required": true
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/DocumentMetadata"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/documents/download/{filename}": {
+        "get": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Download Document",
+          "description": "Download a document by filename",
+          "operationId": "download_document_documents_download__filename__get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "filename",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "title": "Filename"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/documents/{document_id}": {
+        "delete": {
+          "tags": [
+            "documents"
+          ],
+          "summary": "Delete Document",
+          "description": "Delete a document by document ID",
+          "operationId": "delete_document_documents__document_id__delete",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "document_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "title": "Document Id"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/analysis/comprehensive": {
+        "post": {
+          "tags": [
+            "analysis"
+          ],
+          "summary": "Analyze Comprehensive",
+          "description": "Comprehensive financial document analysis - runs in background",
+          "operationId": "analyze_comprehensive_analysis_comprehensive_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_analyze_comprehensive_analysis_comprehensive_post"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/analysis/investment": {
+        "post": {
+          "tags": [
+            "analysis"
+          ],
+          "summary": "Analyze Investment",
+          "description": "Investment-focused financial document analysis",
+          "operationId": "analyze_investment_analysis_investment_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_analyze_investment_analysis_investment_post"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/analysis/risk": {
+        "post": {
+          "tags": [
+            "analysis"
+          ],
+          "summary": "Analyze Risk",
+          "description": "Risk-focused financial document analysis",
+          "operationId": "analyze_risk_analysis_risk_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_analyze_risk_analysis_risk_post"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/analysis/verify": {
+        "post": {
+          "tags": [
+            "analysis"
+          ],
+          "summary": "Verify Document",
+          "description": "Verify if the document is a valid financial record",
+          "operationId": "verify_document_analysis_verify_post",
+          "requestBody": {
+            "content": {
+              "multipart/form-data": {
+                "schema": {
+                  "$ref": "#/components/schemas/Body_verify_document_analysis_verify_post"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/analysis/types": {
+        "get": {
+          "tags": [
+            "analysis"
+          ],
+          "summary": "Get Analysis Types",
+          "description": "Get available analysis types",
+          "operationId": "get_analysis_types_analysis_types_get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/reports/": {
+        "get": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "List Reports",
+          "description": "List analysis reports for the current user with optional filtering and pagination",
+          "operationId": "list_reports_reports__get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "analysis_type",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Filter by analysis type",
+                "title": "Analysis Type"
+              },
+              "description": "Filter by analysis type"
+            },
+            {
+              "name": "search_query",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Search in file names, queries, and summaries",
+                "title": "Search Query"
+              },
+              "description": "Search in file names, queries, and summaries"
+            },
+            {
+              "name": "page",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Page number",
+                "default": 1,
+                "title": "Page"
+              },
+              "description": "Page number"
+            },
+            {
+              "name": "page_size",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "maximum": 100,
+                "minimum": 1,
+                "description": "Number of reports per page",
+                "default": 20,
+                "title": "Page Size"
+              },
+              "description": "Number of reports per page"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/AnalysisReportListResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/reports/{report_id}": {
+        "get": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Get Report",
+          "description": "Get a specific analysis report by ID",
+          "operationId": "get_report_reports__report_id__get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/AnalysisReportResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "put": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Update Report",
+          "description": "Update an analysis report (currently only summary can be updated)",
+          "operationId": "update_report_reports__report_id__put",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisReportUpdate"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/AnalysisReportResponse"
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "delete": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Delete Report",
+          "description": "Delete an analysis report and its associated file",
+          "operationId": "delete_report_reports__report_id__delete",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/reports/{report_id}/download": {
+        "get": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Download Report",
+          "description": "Download an analysis report file",
+          "operationId": "download_report_reports__report_id__download_get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/reports/stats/summary": {
+        "get": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Get Reports Stats",
+          "description": "Get summary statistics for user's analysis reports",
+          "operationId": "get_reports_stats_reports_stats_summary_get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          },
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ]
+        }
+      },
+      "/reports/admin/{report_id}": {
+        "delete": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Admin Delete Report",
+          "description": "Admin endpoint to delete any analysis report",
+          "operationId": "admin_delete_report_reports_admin__report_id__delete",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/reports/{report_id}/content": {
+        "get": {
+          "tags": [
+            "reports"
+          ],
+          "summary": "Get Report Content",
+          "description": "Get the text content of an analysis report file",
+          "operationId": "get_report_content_reports__report_id__content_get",
+          "security": [
+            {
+              "HTTPBearer": []
+            }
+          ],
+          "parameters": [
+            {
+              "name": "report_id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "description": "Report ID",
+                "title": "Report Id"
+              },
+              "description": "Report ID"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            },
+            "422": {
+              "description": "Validation Error",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/HTTPValidationError"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/": {
+        "get": {
+          "summary": "Root",
+          "operationId": "root__get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/health": {
+        "get": {
+          "summary": "Health",
+          "operationId": "health_health_get",
+          "responses": {
+            "200": {
+              "description": "Successful Response",
+              "content": {
+                "application/json": {
+                  "schema": {
+  
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "AnalysisReportListResponse": {
+          "properties": {
+            "reports": {
+              "items": {
+                "$ref": "#/components/schemas/AnalysisReportResponse"
+              },
+              "type": "array",
+              "title": "Reports"
+            },
+            "total": {
+              "type": "integer",
+              "title": "Total"
+            },
+            "page": {
+              "type": "integer",
+              "title": "Page"
+            },
+            "page_size": {
+              "type": "integer",
+              "title": "Page Size"
+            },
+            "total_pages": {
+              "type": "integer",
+              "title": "Total Pages"
+            }
+          },
+          "type": "object",
+          "required": [
+            "reports",
+            "total",
+            "page",
+            "page_size",
+            "total_pages"
+          ],
+          "title": "AnalysisReportListResponse"
+        },
+        "AnalysisReportResponse": {
+          "properties": {
+            "analysis_type": {
+              "type": "string",
+              "title": "Analysis Type"
+            },
+            "query": {
+              "type": "string",
+              "title": "Query"
+            },
+            "file_name": {
+              "type": "string",
+              "title": "File Name"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Summary"
+            },
+            "id": {
+              "type": "string",
+              "title": "Id"
+            },
+            "user_id": {
+              "type": "string",
+              "title": "User Id"
+            },
+            "document_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            },
+            "report_path": {
+              "type": "string",
+              "title": "Report Path"
+            },
+            "status": {
+              "$ref": "#/components/schemas/ReportStatus"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Created At"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Updated At"
+            },
+            "download_url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Download Url"
+            }
+          },
+          "type": "object",
+          "required": [
+            "analysis_type",
+            "query",
+            "file_name",
+            "id",
+            "user_id",
+            "document_id",
+            "report_path",
+            "status",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "AnalysisReportResponse"
+        },
+        "AnalysisReportUpdate": {
+          "properties": {
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Summary"
+            }
+          },
+          "type": "object",
+          "title": "AnalysisReportUpdate"
+        },
+        "Body_analyze_comprehensive_analysis_comprehensive_post": {
+          "properties": {
+            "query": {
+              "type": "string",
+              "title": "Query",
+              "default": "Analyze this financial document for comprehensive insights"
+            },
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "binary"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File"
+            },
+            "document_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          },
+          "type": "object",
+          "title": "Body_analyze_comprehensive_analysis_comprehensive_post"
+        },
+        "Body_analyze_investment_analysis_investment_post": {
+          "properties": {
+            "query": {
+              "type": "string",
+              "title": "Query",
+              "default": "Analyze this financial document for investment opportunities"
+            },
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "binary"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File"
+            },
+            "document_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          },
+          "type": "object",
+          "title": "Body_analyze_investment_analysis_investment_post"
+        },
+        "Body_analyze_risk_analysis_risk_post": {
+          "properties": {
+            "query": {
+              "type": "string",
+              "title": "Query",
+              "default": "Analyze this financial document for risk assessment"
+            },
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "binary"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File"
+            },
+            "document_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          },
+          "type": "object",
+          "title": "Body_analyze_risk_analysis_risk_post"
+        },
+        "Body_upload_document_documents_upload_post": {
+          "properties": {
+            "file": {
+              "type": "string",
+              "format": "binary",
+              "title": "File"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          "type": "object",
+          "required": [
+            "file"
+          ],
+          "title": "Body_upload_document_documents_upload_post"
+        },
+        "Body_verify_document_analysis_verify_post": {
+          "properties": {
+            "query": {
+              "type": "string",
+              "title": "Query",
+              "default": "Verify if this is a valid financial document"
+            },
+            "file": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "binary"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "File"
+            },
+            "document_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          },
+          "type": "object",
+          "title": "Body_verify_document_analysis_verify_post"
+        },
+        "DocumentMetadata": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "title": "Id"
+            },
+            "name": {
+              "type": "string",
+              "title": "Name"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "title": "Size Bytes"
+            },
+            "modified_at": {
+              "type": "string",
+              "title": "Modified At"
+            },
+            "path": {
+              "type": "string",
+              "title": "Path"
+            },
+            "download_url": {
+              "type": "string",
+              "title": "Download Url"
+            }
+          },
+          "type": "object",
+          "required": [
+            "id",
+            "name",
+            "size_bytes",
+            "modified_at",
+            "path",
+            "download_url"
+          ],
+          "title": "DocumentMetadata"
+        },
+        "HTTPValidationError": {
+          "properties": {
+            "detail": {
+              "items": {
+                "$ref": "#/components/schemas/ValidationError"
+              },
+              "type": "array",
+              "title": "Detail"
+            }
+          },
+          "type": "object",
+          "title": "HTTPValidationError"
+        },
+        "LoginResponse": {
+          "properties": {
+            "access_token": {
+              "type": "string",
+              "title": "Access Token"
+            },
+            "refresh_token": {
+              "type": "string",
+              "title": "Refresh Token"
+            },
+            "token_type": {
+              "type": "string",
+              "title": "Token Type",
+              "default": "bearer"
+            },
+            "expires_in": {
+              "type": "integer",
+              "title": "Expires In"
+            },
+            "user": {
+              "$ref": "#/components/schemas/UserResponse"
+            }
+          },
+          "type": "object",
+          "required": [
+            "access_token",
+            "refresh_token",
+            "expires_in",
+            "user"
+          ],
+          "title": "LoginResponse"
+        },
+        "PasswordChangeRequest": {
+          "properties": {
+            "current_password": {
+              "type": "string",
+              "title": "Current Password"
+            },
+            "new_password": {
+              "type": "string",
+              "title": "New Password"
+            }
+          },
+          "type": "object",
+          "required": [
+            "current_password",
+            "new_password"
+          ],
+          "title": "PasswordChangeRequest"
+        },
+        "RefreshTokenRequest": {
+          "properties": {
+            "refresh_token": {
+              "type": "string",
+              "title": "Refresh Token"
+            }
+          },
+          "type": "object",
+          "required": [
+            "refresh_token"
+          ],
+          "title": "RefreshTokenRequest"
+        },
+        "ReportStatus": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed",
+            "failed"
+          ],
+          "title": "ReportStatus"
+        },
+        "UserCreate": {
+          "properties": {
+            "username": {
+              "type": "string",
+              "title": "Username"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "title": "Email"
+            },
+            "is_active": {
+              "type": "boolean",
+              "title": "Is Active",
+              "default": true
+            },
+            "is_admin": {
+              "type": "boolean",
+              "title": "Is Admin",
+              "default": false
+            },
+            "password": {
+              "type": "string",
+              "maxLength": 72,
+              "minLength": 1,
+              "title": "Password",
+              "description": "Password (max 72 characters due to bcrypt limitation)"
+            }
+          },
+          "type": "object",
+          "required": [
+            "username",
+            "email",
+            "password"
+          ],
+          "title": "UserCreate"
+        },
+        "UserLogin": {
+          "properties": {
+            "username": {
+              "type": "string",
+              "title": "Username"
+            },
+            "password": {
+              "type": "string",
+              "title": "Password"
+            }
+          },
+          "type": "object",
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "UserLogin"
+        },
+        "UserResponse": {
+          "properties": {
+            "username": {
+              "type": "string",
+              "title": "Username"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "title": "Email"
+            },
+            "is_active": {
+              "type": "boolean",
+              "title": "Is Active",
+              "default": true
+            },
+            "is_admin": {
+              "type": "boolean",
+              "title": "Is Admin",
+              "default": false
+            },
+            "id": {
+              "type": "string",
+              "title": "Id"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Created At"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Updated At"
+            }
+          },
+          "type": "object",
+          "required": [
+            "username",
+            "email",
+            "id",
+            "created_at",
+            "updated_at"
+          ],
+          "title": "UserResponse"
+        },
+        "ValidationError": {
+          "properties": {
+            "loc": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array",
+              "title": "Location"
+            },
+            "msg": {
+              "type": "string",
+              "title": "Message"
+            },
+            "type": {
+              "type": "string",
+              "title": "Error Type"
+            }
+          },
+          "type": "object",
+          "required": [
+            "loc",
+            "msg",
+            "type"
+          ],
+          "title": "ValidationError"
+        }
+      },
+      "securitySchemes": {
+        "HTTPBearer": {
+          "type": "http",
+          "scheme": "bearer"
+        }
+      }
+    }
+  }
