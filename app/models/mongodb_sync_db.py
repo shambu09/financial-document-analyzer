@@ -163,7 +163,7 @@ class MongoDBUserRepository(UserRepository):
             logger.error(f"Error getting user by email: {str(e)}")
             raise
     
-    def update_user(self, user_id: int, **kwargs) -> bool:
+    def update_user(self, user_id: str, **kwargs) -> bool:
         """Update user information"""
         try:
             # Convert user_id to ObjectId
@@ -181,7 +181,7 @@ class MongoDBUserRepository(UserRepository):
             logger.error(f"Error updating user: {str(e)}")
             raise
     
-    def delete_user(self, user_id: int) -> bool:
+    def delete_user(self, user_id: str) -> bool:
         """Delete user"""
         try:
             user_object_id = ObjectId(str(user_id))
@@ -220,7 +220,7 @@ class MongoDBSessionRepository(SessionRepository):
     def __init__(self, db: MongoDBDatabase):
         self.db = db
     
-    def create_session(self, user_id: int, session_token: str, refresh_token: str, expires_at: datetime) -> int:
+    def create_session(self, user_id: str, session_token: str, refresh_token: str, expires_at: datetime) -> str:
         """Create a new session and return session ID"""
         try:
             session_doc = {
@@ -258,7 +258,7 @@ class MongoDBSessionRepository(SessionRepository):
             logger.error(f"Error getting session by refresh token: {str(e)}")
             raise
     
-    def update_session(self, session_id: int, **kwargs) -> bool:
+    def update_session(self, session_id: str, **kwargs) -> bool:
         """Update session information"""
         try:
             session_object_id = ObjectId(str(session_id))
@@ -271,7 +271,7 @@ class MongoDBSessionRepository(SessionRepository):
             logger.error(f"Error updating session: {str(e)}")
             raise
     
-    def revoke_session(self, session_id: int) -> bool:
+    def revoke_session(self, session_id: str) -> bool:
         """Revoke a session"""
         try:
             session_object_id = ObjectId(str(session_id))
@@ -281,7 +281,7 @@ class MongoDBSessionRepository(SessionRepository):
             logger.error(f"Error revoking session: {str(e)}")
             raise
     
-    def revoke_user_sessions(self, user_id: int) -> bool:
+    def revoke_user_sessions(self, user_id: str) -> bool:
         """Revoke all sessions for a user"""
         try:
             result = self.db.db.sessions.delete_many({"user_id": str(user_id)})
@@ -350,7 +350,7 @@ class MongoDBDocumentRepository(DocumentRepository):
             logger.error(f"Error getting document: {str(e)}")
             raise
     
-    def get_user_documents(self, user_id: Union[int, str], search_query: Optional[str] = None,
+    def get_user_documents(self, user_id: str, search_query: Optional[str] = None,
                           limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         """Get documents for a user with optional search"""
         try:
@@ -429,7 +429,7 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error creating analysis report: {str(e)}")
             raise
     
-    def get_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> Optional[Dict[str, Any]]:
+    def get_report(self, report_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get analysis report by ID for a user"""
         try:
             report_doc = self.db.db.analysis_reports.find_one({
@@ -443,7 +443,7 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting report: {str(e)}")
             raise
     
-    def get_user_reports(self, user_id: Union[int, str], analysis_type: Optional[str] = None,
+    def get_user_reports(self, user_id: str, analysis_type: Optional[str] = None,
                         search_query: Optional[str] = None, limit: int = 50,
                         offset: int = 0) -> List[Dict[str, Any]]:
         """Get analysis reports for a user with filtering"""
@@ -464,7 +464,7 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting user reports: {str(e)}")
             raise
     
-    def update_report(self, report_id: Union[int, str], user_id: Union[int, str], **kwargs) -> bool:
+    def update_report(self, report_id: str, user_id: str, **kwargs) -> bool:
         """Update analysis report"""
         try:
             result = self.db.db.analysis_reports.update_one(
@@ -476,7 +476,7 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error updating report: {str(e)}")
             raise
     
-    def delete_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> bool:
+    def delete_report(self, report_id: str, user_id: str) -> bool:
         """Delete analysis report"""
         try:
             result = self.db.db.analysis_reports.delete_one({
@@ -488,7 +488,7 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error deleting report: {str(e)}")
             raise
     
-    def get_reports_count(self, user_id: Union[int, str], analysis_type: Optional[str] = None) -> int:
+    def get_reports_count(self, user_id: str, analysis_type: Optional[str] = None) -> int:
         """Get total count of reports for a user"""
         try:
             query = {"user_id": str(user_id)}

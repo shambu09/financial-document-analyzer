@@ -85,7 +85,7 @@ async def list_reports(
 
 @router.get("/{report_id}", response_model=AnalysisReportResponse)
 async def get_report(
-    report_id: Union[int, str] = Path(..., description="Report ID"),
+    report_id: str = Path(..., description="Report ID"),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Get a specific analysis report by ID"""
@@ -122,7 +122,7 @@ async def get_report(
 
 @router.get("/{report_id}/download")
 async def download_report(
-    report_id: Union[int, str] = Path(..., description="Report ID"),
+    report_id: str = Path(..., description="Report ID"),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Download an analysis report file"""
@@ -138,11 +138,16 @@ async def download_report(
         if not os.path.exists(report_path):
             raise HTTPException(status_code=404, detail="Report file not found")
         
-        # Return the file
+        # Return the file as Markdown
+        # Ensure filename has .md extension
+        filename = report_data['file_name']
+        if not filename.endswith('.md'):
+            filename = filename.rsplit('.', 1)[0] + '.md'
+        
         return FileResponse(
             path=report_path,
-            filename=report_data['file_name'],
-            media_type='application/octet-stream'
+            filename=filename,
+            media_type='text/markdown'
         )
         
     except HTTPException:
@@ -153,7 +158,7 @@ async def download_report(
 
 @router.put("/{report_id}", response_model=AnalysisReportResponse)
 async def update_report(
-    report_id: Union[int, str] = Path(..., description="Report ID"),
+    report_id: str = Path(..., description="Report ID"),
     update_data: AnalysisReportUpdate = ...,
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
@@ -202,7 +207,7 @@ async def update_report(
 
 @router.delete("/{report_id}")
 async def delete_report(
-    report_id: Union[int, str] = Path(..., description="Report ID"),
+    report_id: str = Path(..., description="Report ID"),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Delete an analysis report and its associated file"""
@@ -265,7 +270,7 @@ async def get_reports_stats(
 
 @router.delete("/admin/{report_id}")
 async def admin_delete_report(
-    report_id: Union[int, str] = Path(..., description="Report ID"),
+    report_id: str = Path(..., description="Report ID"),
     current_user: Dict[str, Any] = Depends(get_current_admin_user)
 ):
     """Admin endpoint to delete any analysis report"""
@@ -297,4 +302,47 @@ async def admin_delete_report(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting report: {str(e)}")
+
+
+@router.get("/{report_id}/content")
+async def get_report_content(
+    report_id: str = Path(..., description="Report ID"),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
+):
+    """Get the text content of an analysis report file"""
+    try:
+        # Get report data
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
+        if not report_data:
+            raise HTTPException(status_code=404, detail="Report not found")
+        
+        report_path = report_data['report_path']
+        
+        # Check if file exists
+        if not os.path.exists(report_path):
+            raise HTTPException(status_code=404, detail="Report file not found")
+        
+        # Read file content
+        try:
+            with open(report_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading report file: {str(e)}")
+        
+        return {
+            "report_id": report_id,
+            "file_name": report_data['file_name'],
+            "analysis_type": report_data['analysis_type'],
+            "query": report_data['query'],
+            "status": report_data['status'],
+            "created_at": report_data['created_at'],
+            "updated_at": report_data['updated_at'],
+            "content": content,
+            "content_type": "text/markdown"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving report content: {str(e)}")
 

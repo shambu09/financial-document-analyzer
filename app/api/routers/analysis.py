@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 import os
 import uuid
@@ -11,7 +11,9 @@ from app.domain.agents import financial_analyst, verifier, investment_advisor, r
 from app.domain.task import analyze_financial_document, investment_analysis, risk_assessment, verification
 from app.api.routers.auth import get_current_active_user
 from app.models.auth import User, DatabaseManager, AnalysisReport
-from app.models.factory import get_document_model
+from app.models.factory import get_document_model, get_analysis_report_model
+from app.models.schemas import ReportStatus
+from app.services.background_tasks import get_analysis_task
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -31,7 +33,7 @@ def run_crew(agents, tasks, query: str, file_path: str):
     result = crew.kickoff({'query': query, 'file_path': file_path})
     return result
 
-def validate_document_ownership(document_id: Optional[Union[int, str]], user_id: Union[int, str]) -> None:
+def validate_document_ownership(document_id: Optional[str], user_id: str) -> None:
     """Validate that the document belongs to the user"""
     if document_id is not None:
         document = document_model.get_document(document_id, user_id)
@@ -47,7 +49,7 @@ def save_analysis_report(
     query: str,
     file_name: str,
     analysis_result: str,
-    document_id: Optional[Union[int, str]] = None
+    document_id: Optional[str] = None
 ) -> int:
     """Save analysis report to database and filesystem"""
     try:
@@ -91,12 +93,13 @@ def save_analysis_report(
 
 @router.post("/comprehensive")
 async def analyze_comprehensive(
+    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for comprehensive insights"),
     file: Optional[UploadFile] = File(None),
-    document_id: Optional[Union[int, str]] = Form(None),
+    document_id: Optional[str] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
-    """Comprehensive financial document analysis"""
+    """Comprehensive financial document analysis - runs in background"""
     
     # Validate that either file or document_id is provided, but not both
     if not file and not document_id:
@@ -123,8 +126,15 @@ async def analyze_comprehensive(
     else:
         # Handle file upload
         file_id = str(uuid.uuid4())
-        file_path = f"data/analysis_{file_id}_{current_user['id']}.pdf"
-        file_name = file.filename or f"upload_{file_id}.pdf"
+        # Get file extension from uploaded file
+        file_extension = ""
+        if file.filename and "." in file.filename:
+            file_extension = "." + file.filename.split(".")[-1]
+        else:
+            file_extension = ".pdf"  # Default to PDF if no extension
+        
+        file_path = f"data/analysis_{file_id}_{current_user['id']}{file_extension}"
+        file_name = file.filename or f"upload_{file_id}{file_extension}"
     
     try:
         # Only save file if it was uploaded (not using document_id)
@@ -140,34 +150,40 @@ async def analyze_comprehensive(
         # Validate query
         if not query or query.strip() == "":
             query = "Analyze this financial document for comprehensive insights"
-            
-        # Process the financial document with comprehensive analysis
-        response = run_crew(
-            agents=[financial_analyst],
-            tasks=[analyze_financial_document],
-            query=query.strip(),
-            file_path=file_path
-        )
         
-        # Save analysis report
-        report_id = save_analysis_report(
+        # Create report with pending status
+        analysis_reports = get_analysis_report_model()
+        report_data = analysis_reports.create_report(
             user_id=current_user["id"],
             analysis_type="comprehensive",
             query=query.strip(),
             file_name=file_name,
-            analysis_result=str(response),
+            analysis_result="Analysis queued...",
+            document_id=document_id
+        )
+        report_id = report_data["id"] if isinstance(report_data, dict) else report_data
+        
+        # Start background task
+        background_tasks.add_task(
+            get_analysis_task("comprehensive"),
+            report_id=report_id,
+            query=query.strip(),
+            file_path=file_path,
+            file_name=file_name,
+            user_id=current_user["id"],
             document_id=document_id
         )
         
         return {
-            "status": "success",
+            "status": "queued",
             "analysis_type": "comprehensive",
             "query": query,
-            "analysis": str(response),
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
-            "report_download_url": f"/reports/{report_id}/download"
+            "report_status": ReportStatus.PENDING.value,
+            "report_download_url": f"/reports/{report_id}/download",
+            "message": "Analysis has been queued and will be processed in the background"
         }
         
     except Exception as e:
@@ -178,20 +194,13 @@ async def analyze_comprehensive(
             except:
                 pass  # Ignore cleanup errors
         raise HTTPException(status_code=500, detail=f"Error processing financial document: {str(e)}")
-    
-    finally:
-        # Only cleanup uploaded file, not existing documents
-        if file and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass  # Ignore cleanup errors
 
 @router.post("/investment")
 async def analyze_investment(
+    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for investment opportunities"),
     file: Optional[UploadFile] = File(None),
-    document_id: Optional[Union[int, str]] = Form(None),
+    document_id: Optional[str] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Investment-focused financial document analysis"""
@@ -221,8 +230,15 @@ async def analyze_investment(
     else:
         # Handle file upload
         file_id = str(uuid.uuid4())
-        file_path = f"data/investment_{file_id}_{current_user['id']}.pdf"
-        file_name = file.filename or f"upload_{file_id}.pdf"
+        # Get file extension from uploaded file
+        file_extension = ""
+        if file.filename and "." in file.filename:
+            file_extension = "." + file.filename.split(".")[-1]
+        else:
+            file_extension = ".pdf"  # Default to PDF if no extension
+        
+        file_path = f"data/investment_{file_id}_{current_user['id']}{file_extension}"
+        file_name = file.filename or f"upload_{file_id}{file_extension}"
     
     try:
         # Only save file if it was uploaded (not using document_id)
@@ -238,34 +254,40 @@ async def analyze_investment(
         # Validate query
         if not query or query.strip() == "":
             query = "Analyze this financial document for investment opportunities"
-            
-        # Process the financial document with investment analysis
-        response = run_crew(
-            agents=[investment_advisor],
-            tasks=[investment_analysis],
-            query=query.strip(),
-            file_path=file_path
-        )
         
-        # Save analysis report
-        report_id = save_analysis_report(
+        # Create report with pending status
+        analysis_reports = get_analysis_report_model()
+        report_data = analysis_reports.create_report(
             user_id=current_user["id"],
             analysis_type="investment",
             query=query.strip(),
             file_name=file_name,
-            analysis_result=str(response),
+            analysis_result="Investment analysis queued...",
+            document_id=document_id
+        )
+        report_id = report_data["id"] if isinstance(report_data, dict) else report_data
+        
+        # Start background task
+        background_tasks.add_task(
+            get_analysis_task("investment"),
+            report_id=report_id,
+            query=query.strip(),
+            file_path=file_path,
+            file_name=file_name,
+            user_id=current_user["id"],
             document_id=document_id
         )
         
         return {
-            "status": "success",
+            "status": "queued",
             "analysis_type": "investment",
             "query": query,
-            "analysis": str(response),
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
-            "report_download_url": f"/reports/{report_id}/download"
+            "report_status": ReportStatus.PENDING.value,
+            "report_download_url": f"/reports/{report_id}/download",
+            "message": "Investment analysis has been queued and will be processed in the background"
         }
         
     except Exception as e:
@@ -281,9 +303,10 @@ async def analyze_investment(
 
 @router.post("/risk")
 async def analyze_risk(
+    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for risk assessment"),
     file: Optional[UploadFile] = File(None),
-    document_id: Optional[Union[int, str]] = Form(None),
+    document_id: Optional[str] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Risk-focused financial document analysis"""
@@ -313,8 +336,15 @@ async def analyze_risk(
     else:
         # Handle file upload
         file_id = str(uuid.uuid4())
-        file_path = f"data/risk_{file_id}_{current_user['id']}.pdf"
-        file_name = file.filename or f"upload_{file_id}.pdf"
+        # Get file extension from uploaded file
+        file_extension = ""
+        if file.filename and "." in file.filename:
+            file_extension = "." + file.filename.split(".")[-1]
+        else:
+            file_extension = ".pdf"  # Default to PDF if no extension
+        
+        file_path = f"data/risk_{file_id}_{current_user['id']}{file_extension}"
+        file_name = file.filename or f"upload_{file_id}{file_extension}"
     
     try:
         # Only save file if it was uploaded (not using document_id)
@@ -330,34 +360,40 @@ async def analyze_risk(
         # Validate query
         if not query or query.strip() == "":
             query = "Analyze this financial document for risk assessment"
-            
-        # Process the financial document with risk analysis
-        response = run_crew(
-            agents=[risk_assessor],
-            tasks=[risk_assessment],
-            query=query.strip(),
-            file_path=file_path
-        )
         
-        # Save analysis report
-        report_id = save_analysis_report(
+        # Create report with pending status
+        analysis_reports = get_analysis_report_model()
+        report_data = analysis_reports.create_report(
             user_id=current_user["id"],
             analysis_type="risk",
             query=query.strip(),
             file_name=file_name,
-            analysis_result=str(response),
+            analysis_result="Risk analysis queued...",
+            document_id=document_id
+        )
+        report_id = report_data["id"] if isinstance(report_data, dict) else report_data
+        
+        # Start background task
+        background_tasks.add_task(
+            get_analysis_task("risk"),
+            report_id=report_id,
+            query=query.strip(),
+            file_path=file_path,
+            file_name=file_name,
+            user_id=current_user["id"],
             document_id=document_id
         )
         
         return {
-            "status": "success",
+            "status": "queued",
             "analysis_type": "risk",
             "query": query,
-            "analysis": str(response),
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
-            "report_download_url": f"/reports/{report_id}/download"
+            "report_status": ReportStatus.PENDING.value,
+            "report_download_url": f"/reports/{report_id}/download",
+            "message": "Risk analysis has been queued and will be processed in the background"
         }
         
     except Exception as e:
@@ -373,9 +409,10 @@ async def analyze_risk(
 
 @router.post("/verify")
 async def verify_document(
+    background_tasks: BackgroundTasks,
     query: str = Form(default="Verify if this is a valid financial document"),
     file: Optional[UploadFile] = File(None),
-    document_id: Optional[Union[int, str]] = Form(None),
+    document_id: Optional[str] = Form(None),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Verify if the document is a valid financial record"""
@@ -405,8 +442,15 @@ async def verify_document(
     else:
         # Handle file upload
         file_id = str(uuid.uuid4())
-        file_path = f"data/verify_{file_id}_{current_user['id']}.pdf"
-        file_name = file.filename or f"upload_{file_id}.pdf"
+        # Get file extension from uploaded file
+        file_extension = ""
+        if file.filename and "." in file.filename:
+            file_extension = "." + file.filename.split(".")[-1]
+        else:
+            file_extension = ".pdf"  # Default to PDF if no extension
+        
+        file_path = f"data/verify_{file_id}_{current_user['id']}{file_extension}"
+        file_name = file.filename or f"upload_{file_id}{file_extension}"
     
     try:
         # Only save file if it was uploaded (not using document_id)
@@ -422,34 +466,40 @@ async def verify_document(
         # Validate query
         if not query or query.strip() == "":
             query = "Verify if this is a valid financial document"
-            
-        # Process the financial document with verification
-        response = run_crew(
-            agents=[verifier],
-            tasks=[verification],
-            query=query.strip(),
-            file_path=file_path
-        )
         
-        # Save analysis report
-        report_id = save_analysis_report(
+        # Create report with pending status
+        analysis_reports = get_analysis_report_model()
+        report_data = analysis_reports.create_report(
             user_id=current_user["id"],
             analysis_type="verification",
             query=query.strip(),
             file_name=file_name,
-            analysis_result=str(response),
+            analysis_result="Verification analysis queued...",
+            document_id=document_id
+        )
+        report_id = report_data["id"] if isinstance(report_data, dict) else report_data
+        
+        # Start background task
+        background_tasks.add_task(
+            get_analysis_task("verification"),
+            report_id=report_id,
+            query=query.strip(),
+            file_path=file_path,
+            file_name=file_name,
+            user_id=current_user["id"],
             document_id=document_id
         )
         
         return {
-            "status": "success",
+            "status": "queued",
             "analysis_type": "verification",
             "query": query,
-            "analysis": str(response),
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
-            "report_download_url": f"/reports/{report_id}/download"
+            "report_status": ReportStatus.PENDING.value,
+            "report_download_url": f"/reports/{report_id}/download",
+            "message": "Verification analysis has been queued and will be processed in the background"
         }
         
     except Exception as e:

@@ -36,6 +36,12 @@ class AuthMiddleware:
         
         request = Request(scope, receive)
         path = request.url.path
+        method = request.method
+        
+        # Allow OPTIONS requests (CORS preflight) to pass through without authentication
+        if method == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
         
         # Check if path requires authentication
         if self._is_protected_path(path):

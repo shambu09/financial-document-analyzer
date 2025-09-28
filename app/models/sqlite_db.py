@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
 
@@ -28,7 +29,7 @@ class SQLiteDatabase(DatabaseInterface):
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id TEXT PRIMARY KEY,
                         username TEXT UNIQUE NOT NULL,
                         email TEXT UNIQUE NOT NULL,
                         password_hash TEXT NOT NULL,
@@ -44,8 +45,8 @@ class SQLiteDatabase(DatabaseInterface):
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS sessions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
                         session_token TEXT UNIQUE NOT NULL,
                         refresh_token TEXT UNIQUE NOT NULL,
                         expires_at TIMESTAMP NOT NULL,
@@ -60,8 +61,8 @@ class SQLiteDatabase(DatabaseInterface):
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS refresh_tokens (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
                         token_hash TEXT UNIQUE NOT NULL,
                         expires_at TIMESTAMP NOT NULL,
                         is_revoked BOOLEAN DEFAULT 0,
@@ -75,8 +76,8 @@ class SQLiteDatabase(DatabaseInterface):
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS documents (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
                         original_name TEXT NOT NULL,
                         stored_name TEXT NOT NULL,
                         path TEXT NOT NULL,
@@ -94,9 +95,9 @@ class SQLiteDatabase(DatabaseInterface):
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS analysis_reports (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        document_id INTEGER,
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        document_id TEXT,
                         analysis_type TEXT NOT NULL,
                         query TEXT NOT NULL,
                         file_name TEXT NOT NULL,
@@ -129,25 +130,26 @@ class SQLiteUserRepository(UserRepository):
     def __init__(self, db: SQLiteDatabase):
         self.db = db
     
-    def create_user(self, username: str, email: str, password_hash: str, is_admin: bool = False) -> int:
+    def create_user(self, username: str, email: str, password_hash: str, is_admin: bool = False) -> str:
         """Create a new user and return user ID"""
         try:
+            user_id = str(uuid.uuid4())
             with sqlite3.connect(self.db.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO users (username, email, password_hash, is_admin)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO users (id, username, email, password_hash, is_admin)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (username, email, password_hash, is_admin)
+                    (user_id, username, email, password_hash, is_admin)
                 )
                 conn.commit()
-                return cursor.lastrowid
+                return user_id
         except Exception as e:
             logger.error(f"Error creating user: {str(e)}")
             raise
     
-    def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user by ID"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -225,7 +227,7 @@ class SQLiteUserRepository(UserRepository):
             logger.error(f"Error getting user by email: {str(e)}")
             raise
     
-    def update_user(self, user_id: int, **kwargs) -> bool:
+    def update_user(self, user_id: str, **kwargs) -> bool:
         """Update user information"""
         try:
             if not kwargs:
@@ -256,7 +258,7 @@ class SQLiteUserRepository(UserRepository):
             logger.error(f"Error updating user: {str(e)}")
             raise
     
-    def delete_user(self, user_id: int) -> bool:
+    def delete_user(self, user_id: str) -> bool:
         """Delete user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -302,20 +304,21 @@ class SQLiteSessionRepository(SessionRepository):
     def __init__(self, db: SQLiteDatabase):
         self.db = db
     
-    def create_session(self, user_id: int, session_token: str, refresh_token: str, expires_at: datetime) -> int:
+    def create_session(self, user_id: str, session_token: str, refresh_token: str, expires_at: datetime) -> str:
         """Create a new session and return session ID"""
         try:
+            session_id = str(uuid.uuid4())
             with sqlite3.connect(self.db.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO sessions (user_id, session_token, refresh_token, expires_at)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO sessions (id, user_id, session_token, refresh_token, expires_at)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (user_id, session_token, refresh_token, expires_at)
+                    (session_id, user_id, session_token, refresh_token, expires_at)
                 )
                 conn.commit()
-                return cursor.lastrowid
+                return session_id
         except Exception as e:
             logger.error(f"Error creating session: {str(e)}")
             raise
@@ -370,7 +373,7 @@ class SQLiteSessionRepository(SessionRepository):
             logger.error(f"Error getting session by refresh token: {str(e)}")
             raise
     
-    def update_session(self, session_id: int, **kwargs) -> bool:
+    def update_session(self, session_id: str, **kwargs) -> bool:
         """Update session information"""
         try:
             if not kwargs:
@@ -400,7 +403,7 @@ class SQLiteSessionRepository(SessionRepository):
             logger.error(f"Error updating session: {str(e)}")
             raise
     
-    def revoke_session(self, session_id: int) -> bool:
+    def revoke_session(self, session_id: str) -> bool:
         """Revoke a session"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -415,7 +418,7 @@ class SQLiteSessionRepository(SessionRepository):
             logger.error(f"Error revoking session: {str(e)}")
             raise
     
-    def revoke_user_sessions(self, user_id: int) -> bool:
+    def revoke_user_sessions(self, user_id: str) -> bool:
         """Revoke all sessions for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -452,26 +455,27 @@ class SQLiteDocumentRepository(DocumentRepository):
     def __init__(self, db: SQLiteDatabase):
         self.db = db
     
-    def create_document(self, user_id: int, original_name: str, stored_name: str, 
-                       path: str, size_bytes: int, checksum: Optional[str] = None) -> int:
+    def create_document(self, user_id: str, original_name: str, stored_name: str, 
+                       path: str, size_bytes: int, checksum: Optional[str] = None) -> str:
         """Create a new document record and return document ID"""
         try:
+            document_id = str(uuid.uuid4())
             with sqlite3.connect(self.db.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO documents (user_id, original_name, stored_name, path, size_bytes, checksum)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO documents (id, user_id, original_name, stored_name, path, size_bytes, checksum)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, original_name, stored_name, path, size_bytes, checksum)
+                    (document_id, user_id, original_name, stored_name, path, size_bytes, checksum)
                 )
                 conn.commit()
-                return cursor.lastrowid
+                return document_id
         except Exception as e:
             logger.error(f"Error creating document: {str(e)}")
             raise
     
-    def get_document(self, document_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_document(self, document_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get document by ID for a specific user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -498,7 +502,7 @@ class SQLiteDocumentRepository(DocumentRepository):
             logger.error(f"Error getting document: {str(e)}")
             raise
     
-    def get_user_documents(self, user_id: int, search_query: Optional[str] = None,
+    def get_user_documents(self, user_id: str, search_query: Optional[str] = None,
                           limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         """Get documents for a user with optional search"""
         try:
@@ -535,7 +539,7 @@ class SQLiteDocumentRepository(DocumentRepository):
             logger.error(f"Error getting user documents: {str(e)}")
             raise
     
-    def delete_document(self, document_id: int, user_id: int) -> bool:
+    def delete_document(self, document_id: str, user_id: str) -> bool:
         """Delete document for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -550,7 +554,7 @@ class SQLiteDocumentRepository(DocumentRepository):
             logger.error(f"Error deleting document: {str(e)}")
             raise
     
-    def get_documents_count(self, user_id: int) -> int:
+    def get_documents_count(self, user_id: str) -> int:
         """Get total count of documents for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -571,28 +575,29 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
     def __init__(self, db: SQLiteDatabase):
         self.db = db
     
-    def create_report(self, user_id: int, analysis_type: str, query: str, file_name: str,
-                     report_path: str, document_id: Optional[int] = None,
-                     summary: Optional[str] = None, status: str = "completed") -> int:
+    def create_report(self, user_id: str, analysis_type: str, query: str, file_name: str,
+                     report_path: str, document_id: Optional[str] = None,
+                     summary: Optional[str] = None, status: str = "completed") -> str:
         """Create a new analysis report and return report ID"""
         try:
+            report_id = str(uuid.uuid4())
             with sqlite3.connect(self.db.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     """
                     INSERT INTO analysis_reports 
-                    (user_id, document_id, analysis_type, query, file_name, report_path, status, summary)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, user_id, document_id, analysis_type, query, file_name, report_path, status, summary)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, document_id, analysis_type, query, file_name, report_path, status, summary)
+                    (report_id, user_id, document_id, analysis_type, query, file_name, report_path, status, summary)
                 )
                 conn.commit()
-                return cursor.lastrowid
+                return report_id
         except Exception as e:
             logger.error(f"Error creating analysis report: {str(e)}")
             raise
     
-    def get_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> Optional[Dict[str, Any]]:
+    def get_report(self, report_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get analysis report by ID for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -626,7 +631,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting analysis report: {str(e)}")
             raise
     
-    def get_user_reports(self, user_id: Union[int, str], analysis_type: Optional[str] = None,
+    def get_user_reports(self, user_id: str, analysis_type: Optional[str] = None,
                         search_query: Optional[str] = None, limit: int = 50,
                         offset: int = 0) -> List[Dict[str, Any]]:
         """Get analysis reports for a user with filtering"""
@@ -682,7 +687,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting user analysis reports: {str(e)}")
             raise
     
-    def update_report(self, report_id: Union[int, str], user_id: Union[int, str], **kwargs) -> bool:
+    def update_report(self, report_id: str, user_id: str, **kwargs) -> bool:
         """Update analysis report"""
         try:
             if not kwargs:
@@ -713,7 +718,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error updating analysis report: {str(e)}")
             raise
     
-    def delete_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> bool:
+    def delete_report(self, report_id: str, user_id: str) -> bool:
         """Delete analysis report"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -728,7 +733,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error deleting analysis report: {str(e)}")
             raise
     
-    def get_reports_count(self, user_id: Union[int, str], analysis_type: Optional[str] = None) -> int:
+    def get_reports_count(self, user_id: str, analysis_type: Optional[str] = None) -> int:
         """Get total count of reports for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:

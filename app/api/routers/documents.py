@@ -160,25 +160,19 @@ async def download_document(filename: str, current_user: Dict[str, Any] = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error accessing document: {str(e)}")
 
-@router.delete("/{filename}")
-async def delete_document(filename: str, current_user: Dict[str, Any] = Depends(get_current_active_user)):
-    """Delete a document by filename"""
-    safe = sanitize_filename(filename)
+@router.delete("/{document_id}")
+async def delete_document(document_id: str, current_user: Dict[str, Any] = Depends(get_current_active_user)):
+    """Delete a document by document ID"""
     
     try:
-        # Find document in database
-        documents = document_model.get_user_documents(current_user["id"])
-        target_doc = None
-        for doc in documents:
-            if os.path.basename(doc["path"]) == safe:
-                target_doc = doc
-                break
+        # Get document from database by ID
+        target_doc = document_model.get_document(document_id, current_user["id"])
         
         if not target_doc:
             raise HTTPException(status_code=404, detail="Document not found")
         
         # Delete from database
-        success = document_model.delete_document(target_doc["id"], current_user["id"])
+        success = document_model.delete_document(document_id, current_user["id"])
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete document from database")
         
@@ -191,7 +185,7 @@ async def delete_document(filename: str, current_user: Dict[str, Any] = Depends(
                 # Log but don't fail - database record is already deleted
                 print(f"Warning: Could not delete file {file_path}: {e}")
         
-        return {"status": "deleted", "filename": safe, "document_id": str(target_doc["id"])}
+        return {"status": "deleted", "filename": target_doc["original_name"], "document_id": document_id}
         
     except HTTPException:
         raise

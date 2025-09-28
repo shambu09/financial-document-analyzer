@@ -1,6 +1,15 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Union
 from datetime import datetime
+from enum import Enum
+
+
+# Enums
+class ReportStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 # User Schemas
@@ -38,7 +47,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
+    id: str  # String ID for all databases
     created_at: datetime
     updated_at: datetime
 
@@ -97,8 +106,8 @@ class ChangePasswordRequest(BaseModel):
 
 # Session Schemas
 class SessionResponse(BaseModel):
-    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
-    user_id: Union[int, str]
+    id: str  # String ID for all databases
+    user_id: str
     session_token: str
     refresh_token: str
     expires_at: datetime
@@ -120,8 +129,8 @@ class DocumentCreate(DocumentBase):
 
 
 class DocumentResponse(DocumentBase):
-    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
-    user_id: Union[int, str]
+    id: str  # String ID for all databases
+    user_id: str
     stored_name: str
     path: str
     checksum: Optional[str]
@@ -158,15 +167,15 @@ class AnalysisReportBase(BaseModel):
 class AnalysisReportCreate(AnalysisReportBase):
     document_id: Optional[Union[int, str]] = None  # Support both SQLite (int) and MongoDB (str) IDs
     report_path: str
-    status: str = "completed"
+    status: ReportStatus = ReportStatus.PENDING
 
 
 class AnalysisReportResponse(AnalysisReportBase):
-    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
-    user_id: Union[int, str]
-    document_id: Optional[Union[int, str]]  # Support both SQLite (int) and MongoDB (str) IDs
+    id: str  # String ID for all databases
+    user_id: str
+    document_id: Optional[str]  # String ID for all databases
     report_path: str
-    status: str
+    status: ReportStatus
     created_at: datetime
     updated_at: datetime
     download_url: Optional[str] = None
@@ -205,7 +214,7 @@ class AnalysisResponse(BaseModel):
     query: str
     analysis: str
     file_processed: str
-    user_id: Union[int, str]
+    user_id: str
     report_id: Union[int, str]
     report_download_url: str
 

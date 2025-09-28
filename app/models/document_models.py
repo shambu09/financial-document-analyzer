@@ -151,16 +151,16 @@ class AnalysisReport:
             # Generate unique report filename
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_filename = f"{analysis_type}_{user_id}_{timestamp}.txt"
+            report_filename = f"{analysis_type}_{user_id}_{timestamp}.md"
             report_path = os.path.join(output_dir, report_filename)
             
-            # Save analysis result to file
+            # Save analysis result to file as Markdown
             with open(report_path, "w", encoding="utf-8") as f:
-                f.write(f"Analysis Type: {analysis_type}\n")
-                f.write(f"Query: {query}\n")
-                f.write(f"Original File: {file_name}\n")
-                f.write(f"Generated: {datetime.now().isoformat()}\n")
-                f.write("=" * 50 + "\n\n")
+                f.write(f"# {analysis_type.title()} Analysis Report\n\n")
+                f.write(f"**Query:** {query}\n\n")
+                f.write(f"**Original File:** {file_name}\n\n")
+                f.write(f"**Generated:** {datetime.now().isoformat()}\n\n")
+                f.write("---\n\n")
                 f.write(str(analysis_result))
             
             # Create summary (first 200 characters)
