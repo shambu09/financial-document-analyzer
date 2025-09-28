@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from crewai.agents import Agent
+from crewai import Agent
 from crewai import LLM
 from app.services.tools import (
     search_tool, 
