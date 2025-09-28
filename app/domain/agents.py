@@ -1,11 +1,10 @@
-## Importing libraries and files
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 from crewai.agents import Agent
 from crewai import LLM
-from tools import (
+from app.services.tools import (
     search_tool, 
     FinancialDocumentTool,
     read_financial_document,

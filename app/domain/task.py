@@ -1,8 +1,7 @@
-## Importing libraries and files
 from crewai import Task
 
-from agents import financial_analyst, verifier, investment_advisor, risk_assessor
-from tools import (
+from app.domain.agents import financial_analyst, verifier, investment_advisor, risk_assessor
+from app.services.tools import (
     search_tool, 
     FinancialDocumentTool,
     read_financial_document,

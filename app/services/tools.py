@@ -32,11 +32,11 @@ search_tool = SerperDevTool()
 def read_financial_document(path: str = 'data/sample.pdf') -> str:
     """
     Reads and processes a financial document from a PDF file.
-    
-    Args:
+
+        Args:
         path (str): Path to the PDF file to read
-        
-    Returns:
+
+        Returns:
         str: Cleaned and formatted text content from the financial document
         
     Raises:
@@ -53,7 +53,7 @@ def read_financial_document(path: str = 'data/sample.pdf') -> str:
         logger.info(f"Processing PDF file: {path}")
         loader = PyPDFLoader(path)
         docs = loader.load()
-        
+
         if not docs:
             return "No content found in the PDF document"
         
@@ -67,12 +67,12 @@ def read_financial_document(path: str = 'data/sample.pdf') -> str:
             # Add page separator for better readability
             if i > 0:
                 full_report += f"\n\n--- Page {i + 1} ---\n\n"
-            
+
             full_report += content + "\n"
-        
+
         logger.info(f"Successfully processed {len(docs)} pages from {path}")
         return full_report.strip()
-        
+
     except Exception as e:
         logger.error(f"Error processing PDF {path}: {str(e)}")
         raise Exception(f"Failed to process PDF document: {str(e)}")
@@ -242,7 +242,7 @@ class InvestmentTool:
     def analyze_investment_tool(financial_document_data: str) -> str:
         """Legacy method that calls the new tool function."""
         return analyze_investment_opportunities(financial_document_data)
-
+        
 
 class RiskTool:
     """Legacy class wrapper for risk assessment."""
