@@ -1,2 +1,11 @@
 venv
 .env
+.pytest_cache
+__pycache__
+.DS_Store
+.idea
+.vscode
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

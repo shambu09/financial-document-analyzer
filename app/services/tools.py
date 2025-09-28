@@ -13,8 +13,8 @@ from typing import Dict, List, Optional, Any
 from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv
 
-from crewai_tools import tool
-from crewai_tools.tools.serper_dev_tool import SerperDevTool
+from crewai.tools import tool
+from crewai_tools.tools.serper_dev_tool.serper_dev_tool import SerperDevTool
 from langchain_community.document_loaders import PyPDFLoader
 
 # Load environment variables
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Create search tool
 search_tool = SerperDevTool()
+
 
 
 @tool("read_financial_document")
@@ -78,6 +79,7 @@ def read_financial_document(path: str = 'data/sample.pdf') -> str:
         raise Exception(f"Failed to process PDF document: {str(e)}")
 
 
+
 @tool("analyze_investment_opportunities")
 def analyze_investment_opportunities(financial_document_data: str) -> str:
     """
@@ -127,6 +129,7 @@ def analyze_investment_opportunities(financial_document_data: str) -> str:
         return f"Investment analysis failed: {str(e)}"
 
 
+
 @tool("assess_financial_risks")
 def assess_financial_risks(financial_document_data: str) -> str:
     """
@@ -172,6 +175,7 @@ def assess_financial_risks(financial_document_data: str) -> str:
     except Exception as e:
         logger.error(f"Error in risk assessment: {str(e)}")
         return f"Risk assessment failed: {str(e)}"
+
 
 
 @tool("extract_financial_metrics")
