@@ -171,12 +171,18 @@ class MongoDBUserRepository(UserRepository):
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
         """Get user by username"""
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Try to get the current event loop
             try:
-                return loop.run_until_complete(self._get_user_by_username_async(username))
-            finally:
-                loop.close()
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, we need to use a different approach
+                # Use asyncio.create_task to run in the current loop
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self._get_user_by_username_async(username))
+                    return future.result()
+            except RuntimeError:
+                # No event loop running, create a new one
+                return asyncio.run(self._get_user_by_username_async(username))
         except Exception as e:
             logger.error(f"Error getting user by username: {str(e)}")
             raise

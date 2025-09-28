@@ -9,12 +9,12 @@ investment analysis, risk assessment, and financial metrics extraction.
 import os
 import re
 import logging
+import requests
 from typing import Dict, List, Optional, Any
 from decimal import Decimal, InvalidOperation
 from dotenv import load_dotenv
 
 from crewai.tools import tool
-from crewai_tools.tools.serper_dev_tool.serper_dev_tool import SerperDevTool
 from langchain_community.document_loaders import PyPDFLoader
 
 # Load environment variables
@@ -24,8 +24,74 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create search tool
-search_tool = SerperDevTool()
+# Free DuckDuckGo search function (no API key required)
+def _free_web_search(query: str, max_results: int = 5) -> str:
+    """
+    Performs a free web search using DuckDuckGo (no API key required).
+    
+    Args:
+        query (str): The search query
+        max_results (int): Maximum number of results to return (default: 5)
+    
+    Returns:
+        str: Formatted search results with titles, snippets, and URLs
+    """
+    try:
+        # DuckDuckGo Instant Answer API (free, no API key required)
+        url = "https://api.duckduckgo.com/"
+        params = {
+            'q': query,
+            'format': 'json',
+            'no_html': '1',
+            'skip_disambig': '1'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        
+        # Add instant answer if available
+        if data.get('Abstract'):
+            results.append(f"**Instant Answer:** {data['Abstract']}")
+            if data.get('AbstractURL'):
+                results.append(f"Source: {data['AbstractURL']}")
+        
+        # Add related topics
+        if data.get('RelatedTopics'):
+            results.append("\n**Related Information:**")
+            for topic in data['RelatedTopics'][:max_results]:
+                if isinstance(topic, dict) and topic.get('Text'):
+                    results.append(f"- {topic['Text']}")
+                elif isinstance(topic, str):
+                    results.append(f"- {topic}")
+        
+        # Add definition if available
+        if data.get('Definition'):
+            results.append(f"\n**Definition:** {data['Definition']}")
+        
+        # If no instant answer, try DuckDuckGo HTML search
+        if not results:
+            search_url = f"https://html.duckduckgo.com/html/?q={query.replace(' ', '+')}"
+            results.append(f"**Search Query:** {query}")
+            results.append(f"**DuckDuckGo Search:** {search_url}")
+            results.append("**Note:** For detailed results, visit the search URL above.")
+        
+        return "\n".join(results) if results else f"No results found for query: {query}"
+        
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"Web search failed: {str(e)}")
+        return f"Web search temporarily unavailable. Query: {query}"
+    except Exception as e:
+        logger.error(f"Error in web search: {str(e)}")
+        return f"Error performing web search for query: {query}"
+
+# Create the search tool using the @tool decorator
+@tool("free_web_search")
+def search_tool(query: str, max_results: int = 5) -> str:
+    """Free web search using DuckDuckGo (no API key required)"""
+    return _free_web_search(query, max_results)
 
 
 

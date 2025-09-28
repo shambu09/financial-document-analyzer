@@ -48,7 +48,13 @@ class JWTManager:
                 "type": "access"
             })
             
-            encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+            # Ensure secret key is properly encoded
+            if isinstance(self.secret_key, str):
+                secret_key = self.secret_key.encode('utf-8')
+            else:
+                secret_key = self.secret_key
+                
+            encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=self.algorithm)
             return encoded_jwt
             
         except Exception as e:
@@ -71,7 +77,13 @@ class JWTManager:
                 "type": "refresh"
             })
             
-            encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+            # Ensure secret key is properly encoded
+            if isinstance(self.secret_key, str):
+                secret_key = self.secret_key.encode('utf-8')
+            else:
+                secret_key = self.secret_key
+                
+            encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=self.algorithm)
             return encoded_jwt
             
         except Exception as e:
@@ -81,7 +93,13 @@ class JWTManager:
     def verify_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
         """Verify and decode a JWT token"""
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            # Ensure secret key is properly encoded
+            if isinstance(self.secret_key, str):
+                secret_key = self.secret_key.encode('utf-8')
+            else:
+                secret_key = self.secret_key
+                
+            payload = jwt.decode(token, secret_key, algorithms=[self.algorithm])
             
             # Check token type
             if payload.get("type") != token_type:

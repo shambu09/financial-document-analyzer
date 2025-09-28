@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import os
 import uuid
 import asyncio
-from typing import Optional
+from typing import Optional, Union, Dict, Any
 from datetime import datetime
 
 from crewai import Crew, Process
@@ -11,12 +11,14 @@ from app.domain.agents import financial_analyst, verifier, investment_advisor, r
 from app.domain.task import analyze_financial_document, investment_analysis, risk_assessment, verification
 from app.api.routers.auth import get_current_active_user
 from app.models.auth import User, DatabaseManager, AnalysisReport
+from app.models.factory import get_document_model
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 # Initialize database manager
 db_manager = DatabaseManager()
 analysis_reports = AnalysisReport(db_manager)
+document_model = get_document_model()
 
 def run_crew(agents, tasks, query: str, file_path: str):
     """Run the crew with specified agents and tasks"""
@@ -29,13 +31,23 @@ def run_crew(agents, tasks, query: str, file_path: str):
     result = crew.kickoff({'query': query, 'file_path': file_path})
     return result
 
+def validate_document_ownership(document_id: Optional[Union[int, str]], user_id: Union[int, str]) -> None:
+    """Validate that the document belongs to the user"""
+    if document_id is not None:
+        document = document_model.get_document(document_id, user_id)
+        if not document:
+            raise HTTPException(
+                status_code=404, 
+                detail="Document not found or you don't have permission to access it"
+            )
+
 def save_analysis_report(
     user_id: int,
     analysis_type: str,
     query: str,
     file_name: str,
     analysis_result: str,
-    document_id: Optional[int] = None
+    document_id: Optional[Union[int, str]] = None
 ) -> int:
     """Save analysis report to database and filesystem"""
     try:
@@ -79,23 +91,51 @@ def save_analysis_report(
 
 @router.post("/comprehensive")
 async def analyze_comprehensive(
-    file: UploadFile = File(...),
     query: str = Form(default="Analyze this financial document for comprehensive insights"),
-    current_user: User = Depends(get_current_active_user)
+    file: Optional[UploadFile] = File(None),
+    document_id: Optional[Union[int, str]] = Form(None),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Comprehensive financial document analysis"""
     
-    file_id = str(uuid.uuid4())
-    file_path = f"data/analysis_{file_id}_{current_user.id}.pdf"
+    # Validate that either file or document_id is provided, but not both
+    if not file and not document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Either file upload or document_id must be provided"
+        )
+    
+    if file and document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot provide both file upload and document_id. Choose one."
+        )
+    
+    # Validate document ownership if document_id is provided
+    if document_id:
+        validate_document_ownership(document_id, current_user["id"])
+        # Get document details for analysis
+        document = document_model.get_document(document_id, current_user["id"])
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        file_path = document['path']
+        file_name = document['original_name']
+    else:
+        # Handle file upload
+        file_id = str(uuid.uuid4())
+        file_path = f"data/analysis_{file_id}_{current_user['id']}.pdf"
+        file_name = file.filename or f"upload_{file_id}.pdf"
     
     try:
-        # Ensure data directory exists
-        os.makedirs("data", exist_ok=True)
-        
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Only save file if it was uploaded (not using document_id)
+        if file:
+            # Ensure data directory exists
+            os.makedirs("data", exist_ok=True)
+            
+            # Save uploaded file
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
         
         # Validate query
         if not query or query.strip() == "":
@@ -111,11 +151,12 @@ async def analyze_comprehensive(
         
         # Save analysis report
         report_id = save_analysis_report(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type="comprehensive",
             query=query.strip(),
-            file_name=file.filename,
-            analysis_result=str(response)
+            file_name=file_name,
+            analysis_result=str(response),
+            document_id=document_id
         )
         
         return {
@@ -123,18 +164,24 @@ async def analyze_comprehensive(
             "analysis_type": "comprehensive",
             "query": query,
             "analysis": str(response),
-            "file_processed": file.filename,
-            "user_id": current_user.id,
+            "file_processed": file_name,
+            "user_id": current_user["id"],
             "report_id": report_id,
             "report_download_url": f"/reports/{report_id}/download"
         }
         
     except Exception as e:
+        # Only cleanup uploaded file, not existing documents
+        if file and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass  # Ignore cleanup errors
         raise HTTPException(status_code=500, detail=f"Error processing financial document: {str(e)}")
     
     finally:
-        # Clean up uploaded file
-        if os.path.exists(file_path):
+        # Only cleanup uploaded file, not existing documents
+        if file and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except:
@@ -142,23 +189,51 @@ async def analyze_comprehensive(
 
 @router.post("/investment")
 async def analyze_investment(
-    file: UploadFile = File(...),
     query: str = Form(default="Analyze this financial document for investment opportunities"),
-    current_user: User = Depends(get_current_active_user)
+    file: Optional[UploadFile] = File(None),
+    document_id: Optional[Union[int, str]] = Form(None),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Investment-focused financial document analysis"""
     
-    file_id = str(uuid.uuid4())
-    file_path = f"data/investment_{file_id}_{current_user.id}.pdf"
+    # Validate that either file or document_id is provided, but not both
+    if not file and not document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Either file upload or document_id must be provided"
+        )
+    
+    if file and document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot provide both file upload and document_id. Choose one."
+        )
+    
+    # Validate document ownership if document_id is provided
+    if document_id:
+        validate_document_ownership(document_id, current_user["id"])
+        # Get document details for analysis
+        document = document_model.get_document(document_id, current_user["id"])
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        file_path = document['path']
+        file_name = document['original_name']
+    else:
+        # Handle file upload
+        file_id = str(uuid.uuid4())
+        file_path = f"data/investment_{file_id}_{current_user['id']}.pdf"
+        file_name = file.filename or f"upload_{file_id}.pdf"
     
     try:
-        # Ensure data directory exists
-        os.makedirs("data", exist_ok=True)
-        
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Only save file if it was uploaded (not using document_id)
+        if file:
+            # Ensure data directory exists
+            os.makedirs("data", exist_ok=True)
+            
+            # Save uploaded file
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
         
         # Validate query
         if not query or query.strip() == "":
@@ -174,11 +249,12 @@ async def analyze_investment(
         
         # Save analysis report
         report_id = save_analysis_report(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type="investment",
             query=query.strip(),
-            file_name=file.filename,
-            analysis_result=str(response)
+            file_name=file_name,
+            analysis_result=str(response),
+            document_id=document_id
         )
         
         return {
@@ -186,8 +262,8 @@ async def analyze_investment(
             "analysis_type": "investment",
             "query": query,
             "analysis": str(response),
-            "file_processed": file.filename,
-            "user_id": current_user.id,
+            "file_processed": file_name,
+            "user_id": current_user["id"],
             "report_id": report_id,
             "report_download_url": f"/reports/{report_id}/download"
         }
@@ -196,8 +272,8 @@ async def analyze_investment(
         raise HTTPException(status_code=500, detail=f"Error processing investment analysis: {str(e)}")
     
     finally:
-        # Clean up uploaded file
-        if os.path.exists(file_path):
+        # Only cleanup uploaded file, not existing documents
+        if file and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except:
@@ -205,23 +281,51 @@ async def analyze_investment(
 
 @router.post("/risk")
 async def analyze_risk(
-    file: UploadFile = File(...),
     query: str = Form(default="Analyze this financial document for risk assessment"),
-    current_user: User = Depends(get_current_active_user)
+    file: Optional[UploadFile] = File(None),
+    document_id: Optional[Union[int, str]] = Form(None),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Risk-focused financial document analysis"""
     
-    file_id = str(uuid.uuid4())
-    file_path = f"data/risk_{file_id}_{current_user.id}.pdf"
+    # Validate that either file or document_id is provided, but not both
+    if not file and not document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Either file upload or document_id must be provided"
+        )
+    
+    if file and document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot provide both file upload and document_id. Choose one."
+        )
+    
+    # Validate document ownership if document_id is provided
+    if document_id:
+        validate_document_ownership(document_id, current_user["id"])
+        # Get document details for analysis
+        document = document_model.get_document(document_id, current_user["id"])
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        file_path = document['path']
+        file_name = document['original_name']
+    else:
+        # Handle file upload
+        file_id = str(uuid.uuid4())
+        file_path = f"data/risk_{file_id}_{current_user['id']}.pdf"
+        file_name = file.filename or f"upload_{file_id}.pdf"
     
     try:
-        # Ensure data directory exists
-        os.makedirs("data", exist_ok=True)
-        
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Only save file if it was uploaded (not using document_id)
+        if file:
+            # Ensure data directory exists
+            os.makedirs("data", exist_ok=True)
+            
+            # Save uploaded file
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
         
         # Validate query
         if not query or query.strip() == "":
@@ -237,11 +341,12 @@ async def analyze_risk(
         
         # Save analysis report
         report_id = save_analysis_report(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type="risk",
             query=query.strip(),
-            file_name=file.filename,
-            analysis_result=str(response)
+            file_name=file_name,
+            analysis_result=str(response),
+            document_id=document_id
         )
         
         return {
@@ -249,8 +354,8 @@ async def analyze_risk(
             "analysis_type": "risk",
             "query": query,
             "analysis": str(response),
-            "file_processed": file.filename,
-            "user_id": current_user.id,
+            "file_processed": file_name,
+            "user_id": current_user["id"],
             "report_id": report_id,
             "report_download_url": f"/reports/{report_id}/download"
         }
@@ -259,8 +364,8 @@ async def analyze_risk(
         raise HTTPException(status_code=500, detail=f"Error processing risk analysis: {str(e)}")
     
     finally:
-        # Clean up uploaded file
-        if os.path.exists(file_path):
+        # Only cleanup uploaded file, not existing documents
+        if file and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except:
@@ -268,23 +373,51 @@ async def analyze_risk(
 
 @router.post("/verify")
 async def verify_document(
-    file: UploadFile = File(...),
     query: str = Form(default="Verify if this is a valid financial document"),
-    current_user: User = Depends(get_current_active_user)
+    file: Optional[UploadFile] = File(None),
+    document_id: Optional[Union[int, str]] = Form(None),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Verify if the document is a valid financial record"""
     
-    file_id = str(uuid.uuid4())
-    file_path = f"data/verify_{file_id}_{current_user.id}.pdf"
+    # Validate that either file or document_id is provided, but not both
+    if not file and not document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Either file upload or document_id must be provided"
+        )
+    
+    if file and document_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot provide both file upload and document_id. Choose one."
+        )
+    
+    # Validate document ownership if document_id is provided
+    if document_id:
+        validate_document_ownership(document_id, current_user["id"])
+        # Get document details for analysis
+        document = document_model.get_document(document_id, current_user["id"])
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        file_path = document['path']
+        file_name = document['original_name']
+    else:
+        # Handle file upload
+        file_id = str(uuid.uuid4())
+        file_path = f"data/verify_{file_id}_{current_user['id']}.pdf"
+        file_name = file.filename or f"upload_{file_id}.pdf"
     
     try:
-        # Ensure data directory exists
-        os.makedirs("data", exist_ok=True)
-        
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Only save file if it was uploaded (not using document_id)
+        if file:
+            # Ensure data directory exists
+            os.makedirs("data", exist_ok=True)
+            
+            # Save uploaded file
+            with open(file_path, "wb") as f:
+                content = await file.read()
+                f.write(content)
         
         # Validate query
         if not query or query.strip() == "":
@@ -300,11 +433,12 @@ async def verify_document(
         
         # Save analysis report
         report_id = save_analysis_report(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type="verification",
             query=query.strip(),
-            file_name=file.filename,
-            analysis_result=str(response)
+            file_name=file_name,
+            analysis_result=str(response),
+            document_id=document_id
         )
         
         return {
@@ -312,8 +446,8 @@ async def verify_document(
             "analysis_type": "verification",
             "query": query,
             "analysis": str(response),
-            "file_processed": file.filename,
-            "user_id": current_user.id,
+            "file_processed": file_name,
+            "user_id": current_user["id"],
             "report_id": report_id,
             "report_download_url": f"/reports/{report_id}/download"
         }
@@ -322,15 +456,15 @@ async def verify_document(
         raise HTTPException(status_code=500, detail=f"Error processing document verification: {str(e)}")
     
     finally:
-        # Clean up uploaded file
-        if os.path.exists(file_path):
+        # Only cleanup uploaded file, not existing documents
+        if file and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except:
                 pass  # Ignore cleanup errors
 
 @router.get("/types")
-async def get_analysis_types(current_user: User = Depends(get_current_active_user)):
+async def get_analysis_types(current_user: Dict[str, Any] = Depends(get_current_active_user)):
     """Get available analysis types"""
     return {
         "available_analysis_types": [

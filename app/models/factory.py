@@ -6,7 +6,7 @@ from app.models.sqlite_db import (
     SQLiteDatabase, SQLiteUserRepository, SQLiteSessionRepository, 
     SQLiteDocumentRepository, SQLiteAnalysisReportRepository
 )
-from app.models.mongodb_db import (
+from app.models.mongodb_sync_db import (
     MongoDBDatabase, MongoDBUserRepository, MongoDBSessionRepository,
     MongoDBDocumentRepository, MongoDBAnalysisReportRepository
 )

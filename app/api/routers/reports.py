@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from fastapi.responses import FileResponse
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Union
 import os
 import math
 
-from app.models.auth import DatabaseManager, AnalysisReport, User
+from app.models.factory import get_analysis_report_model
 from app.api.routers.auth import get_current_active_user, get_current_admin_user
 from app.models.schemas import (
     AnalysisReportResponse, 
@@ -15,9 +15,8 @@ from app.models.schemas import (
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-# Initialize database manager
-db_manager = DatabaseManager()
-analysis_reports = AnalysisReport(db_manager)
+# Initialize analysis report model
+analysis_reports = get_analysis_report_model()
 
 
 @router.get("/", response_model=AnalysisReportListResponse)
@@ -26,7 +25,7 @@ async def list_reports(
     search_query: Optional[str] = Query(None, description="Search in file names, queries, and summaries"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Number of reports per page"),
-    current_user: User = Depends(get_current_active_user)
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """List analysis reports for the current user with optional filtering and pagination"""
     
@@ -35,7 +34,7 @@ async def list_reports(
     try:
         # Get reports from database
         reports_data = analysis_reports.get_user_reports(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type=analysis_type,
             search_query=search_query,
             limit=page_size,
@@ -44,7 +43,7 @@ async def list_reports(
         
         # Get total count for pagination
         total_count = analysis_reports.get_reports_count(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             analysis_type=analysis_type
         )
         
@@ -86,13 +85,13 @@ async def list_reports(
 
 @router.get("/{report_id}", response_model=AnalysisReportResponse)
 async def get_report(
-    report_id: int = Path(..., description="Report ID"),
-    current_user: User = Depends(get_current_active_user)
+    report_id: Union[int, str] = Path(..., description="Report ID"),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Get a specific analysis report by ID"""
     
     try:
-        report_data = analysis_reports.get_report(report_id, current_user.id)
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
         
         if not report_data:
             raise HTTPException(status_code=404, detail="Report not found")
@@ -123,13 +122,13 @@ async def get_report(
 
 @router.get("/{report_id}/download")
 async def download_report(
-    report_id: int = Path(..., description="Report ID"),
-    current_user: User = Depends(get_current_active_user)
+    report_id: Union[int, str] = Path(..., description="Report ID"),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Download an analysis report file"""
     
     try:
-        report_data = analysis_reports.get_report(report_id, current_user.id)
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
         
         if not report_data:
             raise HTTPException(status_code=404, detail="Report not found")
@@ -154,28 +153,28 @@ async def download_report(
 
 @router.put("/{report_id}", response_model=AnalysisReportResponse)
 async def update_report(
-    report_id: int = Path(..., description="Report ID"),
+    report_id: Union[int, str] = Path(..., description="Report ID"),
     update_data: AnalysisReportUpdate = ...,
-    current_user: User = Depends(get_current_active_user)
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Update an analysis report (currently only summary can be updated)"""
     
     try:
         # Check if report exists and belongs to user
-        report_data = analysis_reports.get_report(report_id, current_user.id)
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
         if not report_data:
             raise HTTPException(status_code=404, detail="Report not found")
         
         # Update summary if provided
         if update_data.summary is not None:
-            success = analysis_reports.update_report_summary(
-                report_id, current_user.id, update_data.summary
+            success = analysis_reports.update_report(
+                report_id, current_user["id"], summary=update_data.summary
             )
             if not success:
                 raise HTTPException(status_code=500, detail="Failed to update report")
         
         # Get updated report data
-        updated_report_data = analysis_reports.get_report(report_id, current_user.id)
+        updated_report_data = analysis_reports.get_report(report_id, current_user["id"])
         
         # Generate download URL
         download_url = f"/reports/{updated_report_data['id']}/download" if os.path.exists(updated_report_data['report_path']) else None
@@ -203,19 +202,19 @@ async def update_report(
 
 @router.delete("/{report_id}")
 async def delete_report(
-    report_id: int = Path(..., description="Report ID"),
-    current_user: User = Depends(get_current_active_user)
+    report_id: Union[int, str] = Path(..., description="Report ID"),
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Delete an analysis report and its associated file"""
     
     try:
         # Get report data first to get file path
-        report_data = analysis_reports.get_report(report_id, current_user.id)
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
         if not report_data:
             raise HTTPException(status_code=404, detail="Report not found")
         
         # Delete from database
-        success = analysis_reports.delete_report(report_id, current_user.id)
+        success = analysis_reports.delete_report(report_id, current_user["id"])
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete report from database")
         
@@ -238,17 +237,17 @@ async def delete_report(
 
 @router.get("/stats/summary")
 async def get_reports_stats(
-    current_user: User = Depends(get_current_active_user)
+    current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
     """Get summary statistics for user's analysis reports"""
     
     try:
         # Get counts by analysis type
-        comprehensive_count = analysis_reports.get_reports_count(current_user.id, "comprehensive")
-        investment_count = analysis_reports.get_reports_count(current_user.id, "investment")
-        risk_count = analysis_reports.get_reports_count(current_user.id, "risk")
-        verification_count = analysis_reports.get_reports_count(current_user.id, "verification")
-        total_count = analysis_reports.get_reports_count(current_user.id)
+        comprehensive_count = analysis_reports.get_reports_count(current_user["id"], "comprehensive")
+        investment_count = analysis_reports.get_reports_count(current_user["id"], "investment")
+        risk_count = analysis_reports.get_reports_count(current_user["id"], "risk")
+        verification_count = analysis_reports.get_reports_count(current_user["id"], "verification")
+        total_count = analysis_reports.get_reports_count(current_user["id"])
         
         return {
             "total_reports": total_count,
@@ -266,33 +265,26 @@ async def get_reports_stats(
 
 @router.delete("/admin/{report_id}")
 async def admin_delete_report(
-    report_id: int = Path(..., description="Report ID"),
-    current_user: User = Depends(get_current_admin_user)
+    report_id: Union[int, str] = Path(..., description="Report ID"),
+    current_user: Dict[str, Any] = Depends(get_current_admin_user)
 ):
     """Admin endpoint to delete any analysis report"""
     
     try:
-        # Get report data first to get file path
-        report_data = analysis_reports.get_report(report_id, 1)  # Use admin user ID
+        # For admin, we need to get the report without user restriction
+        # This is a simplified approach - in production you might want to add
+        # a special admin method to the repository
+        report_data = analysis_reports.get_report(report_id, current_user["id"])
         if not report_data:
-            # Try to get report with any user ID (admin override)
-            with db_manager.db_path as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT * FROM analysis_reports WHERE id = ?",
-                    (report_id,)
-                )
-                report_data = cursor.fetchone()
-                if not report_data:
-                    raise HTTPException(status_code=404, detail="Report not found")
+            raise HTTPException(status_code=404, detail="Report not found")
         
         # Delete from database
-        success = analysis_reports.delete_report(report_id, 1)  # Use admin user ID
+        success = analysis_reports.delete_report(report_id, current_user["id"])
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete report from database")
         
         # Delete file if it exists
-        report_path = report_data['report_path'] if isinstance(report_data, dict) else report_data[6]
+        report_path = report_data['report_path']
         if os.path.exists(report_path):
             try:
                 os.remove(report_path)

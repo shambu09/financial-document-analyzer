@@ -1,7 +1,7 @@
 import sqlite3
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 
 from app.models.database import (
     DatabaseInterface, UserRepository, SessionRepository, 
@@ -592,7 +592,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error creating analysis report: {str(e)}")
             raise
     
-    def get_report(self, report_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> Optional[Dict[str, Any]]:
         """Get analysis report by ID for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -626,7 +626,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting analysis report: {str(e)}")
             raise
     
-    def get_user_reports(self, user_id: int, analysis_type: Optional[str] = None,
+    def get_user_reports(self, user_id: Union[int, str], analysis_type: Optional[str] = None,
                         search_query: Optional[str] = None, limit: int = 50,
                         offset: int = 0) -> List[Dict[str, Any]]:
         """Get analysis reports for a user with filtering"""
@@ -682,7 +682,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error getting user analysis reports: {str(e)}")
             raise
     
-    def update_report(self, report_id: int, user_id: int, **kwargs) -> bool:
+    def update_report(self, report_id: Union[int, str], user_id: Union[int, str], **kwargs) -> bool:
         """Update analysis report"""
         try:
             if not kwargs:
@@ -713,7 +713,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error updating analysis report: {str(e)}")
             raise
     
-    def delete_report(self, report_id: int, user_id: int) -> bool:
+    def delete_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> bool:
         """Delete analysis report"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:
@@ -728,7 +728,7 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
             logger.error(f"Error deleting analysis report: {str(e)}")
             raise
     
-    def get_reports_count(self, user_id: int, analysis_type: Optional[str] = None) -> int:
+    def get_reports_count(self, user_id: Union[int, str], analysis_type: Optional[str] = None) -> int:
         """Get total count of reports for a user"""
         try:
             with sqlite3.connect(self.db.db_path) as conn:

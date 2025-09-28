@@ -5,7 +5,7 @@ load_dotenv()
 from crewai import Agent
 from crewai import LLM
 from app.services.tools import (
-    search_tool, 
+    search_tool,  # Free DuckDuckGo search tool
     FinancialDocumentTool,
     read_financial_document,
     analyze_investment_opportunities,
@@ -15,9 +15,9 @@ from app.services.tools import (
 
 ### Loading LLM
 llm = LLM(
-    model="openai/gpt-4",
+    model="openai/gpt-4o-mini",  # Using cheaper model to reduce costs
     temperature=0.3,  # Lower temperature for more consistent financial analysis
-    max_tokens=2000,  # Increased for more detailed analysis
+    max_tokens=1500,  # Reduced to control costs while maintaining quality
     top_p=0.9,
     frequency_penalty=0.1,
     presence_penalty=0.1,
@@ -44,11 +44,11 @@ financial_analyst = Agent(
     tools=[
         read_financial_document,
         extract_financial_metrics,
-        search_tool
+        search_tool  # Free DuckDuckGo search
     ],
     llm=llm,
-    max_iter=3,  # Increased for more thorough analysis
-    max_rpm=5,   # Increased for better performance
+    max_iter=2,  # Reduced to control API costs
+    max_rpm=3,   # Reduced to control API costs
     allow_delegation=True
 )
 
@@ -72,8 +72,8 @@ verifier = Agent(
         extract_financial_metrics
     ],
     llm=llm,
-    max_iter=2,  # Increased for thorough verification
-    max_rpm=3,   # Increased for better performance
+    max_iter=1,  # Reduced to control API costs
+    max_rpm=2,   # Reduced to control API costs
     allow_delegation=True
 )
 
@@ -97,11 +97,11 @@ investment_advisor = Agent(
         read_financial_document,
         analyze_investment_opportunities,
         extract_financial_metrics,
-        search_tool
+        search_tool  # Free DuckDuckGo search
     ],
     llm=llm,
-    max_iter=3,  # Increased for thorough analysis
-    max_rpm=5,   # Increased for better performance
+    max_iter=2,  # Reduced to control API costs
+    max_rpm=3,   # Reduced to control API costs
     allow_delegation=False
 )
 
@@ -127,7 +127,7 @@ risk_assessor = Agent(
         extract_financial_metrics
     ],
     llm=llm,
-    max_iter=3,  # Increased for thorough risk analysis
-    max_rpm=5,   # Increased for better performance
+    max_iter=2,  # Reduced to control API costs
+    max_rpm=3,   # Reduced to control API costs
     allow_delegation=False
 )

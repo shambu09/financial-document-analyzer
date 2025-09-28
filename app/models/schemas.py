@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 
 
@@ -38,7 +38,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    id: int
+    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
     created_at: datetime
     updated_at: datetime
 
@@ -97,8 +97,8 @@ class ChangePasswordRequest(BaseModel):
 
 # Session Schemas
 class SessionResponse(BaseModel):
-    id: int
-    user_id: int
+    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
+    user_id: Union[int, str]
     session_token: str
     refresh_token: str
     expires_at: datetime
@@ -120,8 +120,8 @@ class DocumentCreate(DocumentBase):
 
 
 class DocumentResponse(DocumentBase):
-    id: int
-    user_id: int
+    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
+    user_id: Union[int, str]
     stored_name: str
     path: str
     checksum: Optional[str]
@@ -156,15 +156,15 @@ class AnalysisReportBase(BaseModel):
 
 
 class AnalysisReportCreate(AnalysisReportBase):
-    document_id: Optional[int] = None
+    document_id: Optional[Union[int, str]] = None  # Support both SQLite (int) and MongoDB (str) IDs
     report_path: str
     status: str = "completed"
 
 
 class AnalysisReportResponse(AnalysisReportBase):
-    id: int
-    user_id: int
-    document_id: Optional[int]
+    id: Union[int, str]  # Support both SQLite (int) and MongoDB (str) IDs
+    user_id: Union[int, str]
+    document_id: Optional[Union[int, str]]  # Support both SQLite (int) and MongoDB (str) IDs
     report_path: str
     status: str
     created_at: datetime
@@ -205,8 +205,8 @@ class AnalysisResponse(BaseModel):
     query: str
     analysis: str
     file_processed: str
-    user_id: int
-    report_id: int
+    user_id: Union[int, str]
+    report_id: Union[int, str]
     report_download_url: str
 
 

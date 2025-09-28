@@ -2,7 +2,7 @@ from crewai import Task
 
 from app.domain.agents import financial_analyst, verifier, investment_advisor, risk_assessor
 from app.services.tools import (
-    search_tool, 
+    search_tool,  # Free DuckDuckGo search tool
     FinancialDocumentTool,
     read_financial_document,
     analyze_investment_opportunities,
@@ -34,8 +34,8 @@ analyze_financial_document = Task(
     agent=financial_analyst,
     tools=[
         read_financial_document, 
-        extract_financial_metrics, 
-        search_tool
+        extract_financial_metrics,
+        search_tool  # Free DuckDuckGo search
     ],
     async_execution=False,
 )
@@ -66,7 +66,7 @@ investment_analysis = Task(
         read_financial_document,
         analyze_investment_opportunities,
         extract_financial_metrics,
-        search_tool
+        search_tool  # Free DuckDuckGo search
     ],
     async_execution=False,
 )

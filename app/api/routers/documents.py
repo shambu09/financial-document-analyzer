@@ -9,15 +9,16 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from app.api.routers.auth import get_current_active_user
-from app.models.auth import DatabaseManager
+from app.models.factory import get_document_model
 
 DATA_DIR = "data"
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-dbm = DatabaseManager()
+document_model = get_document_model()
 
 # Models
 class DocumentMetadata(BaseModel):
+    id: str  # Document ID from database
     name: str
     size_bytes: int
     modified_at: str
@@ -39,9 +40,10 @@ def sanitize_filename(filename: str) -> str:
         base = f"upload_{uuid.uuid4().hex}"
     return base
 
-def build_metadata(file_path: str) -> DocumentMetadata:
+def build_metadata(file_path: str, document_id: str = None) -> DocumentMetadata:
     stat = os.stat(file_path)
     return DocumentMetadata(
+        id=document_id or "unknown",
         name=os.path.basename(file_path),
         size_bytes=stat.st_size,
         modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
@@ -52,44 +54,42 @@ def build_metadata(file_path: str) -> DocumentMetadata:
 # Endpoints
 @router.get("/", response_model=List[DocumentMetadata])
 async def list_documents(q: Optional[str] = None, current_user: Dict[str, Any] = Depends(get_current_active_user)):
-    ensure_data_dir()
-    files = []
-    # Enforce per-user visibility: look up rows in documents table when present; fallback to filesystem for existing installs
-    import sqlite3
+    """List documents for the current user with optional search"""
     try:
-        with sqlite3.connect(dbm.db_path) as conn:
-            cursor = conn.cursor()
-            if current_user.get("is_admin"):
-                if q:
-                    cursor.execute("""
-                        SELECT path FROM documents WHERE original_name LIKE ? ORDER BY created_at DESC
-                    """, (f"%{q}%",))
-                else:
-                    cursor.execute("""
-                        SELECT path FROM documents ORDER BY created_at DESC
-                    """)
-            else:
-                if q:
-                    cursor.execute("""
-                        SELECT path FROM documents WHERE user_id = ? AND original_name LIKE ? ORDER BY created_at DESC
-                    """, (current_user["id"], f"%{q}%"))
-                else:
-                    cursor.execute("""
-                        SELECT path FROM documents WHERE user_id = ? ORDER BY created_at DESC
-                    """, (current_user["id"],))
-            rows = cursor.fetchall()
-            for (path,) in rows:
-                if os.path.isfile(path):
-                    files.append(build_metadata(path))
-    except Exception:
-        # Fallback to filesystem listing if DB missing rows (legacy files)
+        # Get documents from database using the proper model
+        documents = document_model.get_user_documents(
+            user_id=current_user["id"],
+            search_query=q,
+            limit=100,  # Reasonable limit
+            offset=0
+        )
+        
+        files = []
+        for doc in documents:
+            # Check if file still exists on filesystem
+            if os.path.isfile(doc["path"]):
+                files.append(DocumentMetadata(
+                    id=str(doc["id"]),
+                    name=doc["original_name"],
+                    size_bytes=doc["size_bytes"],
+                    modified_at=doc["created_at"],
+                    path=doc["path"],
+                    download_url=f"/documents/download/{os.path.basename(doc['path'])}"
+                ))
+        
+        return files
+        
+    except Exception as e:
+        # Fallback to filesystem listing if database fails
+        ensure_data_dir()
+        files = []
         for entry in os.scandir(DATA_DIR):
             if entry.is_file():
                 if q and q.lower() not in entry.name.lower():
                     continue
                 files.append(build_metadata(entry.path))
-    files.sort(key=lambda m: m.modified_at, reverse=True)
-    return files
+        files.sort(key=lambda m: m.modified_at, reverse=True)
+        return files
 
 @router.post("/upload", response_model=DocumentMetadata)
 async def upload_document(
@@ -97,97 +97,103 @@ async def upload_document(
     name: Optional[str] = Form(default=None),
     current_user: Dict[str, Any] = Depends(get_current_active_user)
 ):
+    """Upload a new document"""
     ensure_data_dir()
     original_name = name or file.filename or f"upload_{uuid.uuid4().hex}"
-    safe_name = sanitize_filename(original_name)
-    # Avoid overwriting existing files
-    final_name = safe_name
-    counter = 1
-    while os.path.exists(os.path.join(DATA_DIR, final_name)):
-        stem, dot, ext = safe_name.rpartition('.')
-        if dot:
-            final_name = f"{stem}_{counter}.{ext}"
-        else:
-            final_name = f"{safe_name}_{counter}"
-        counter += 1
-
-    dest_path = os.path.join(DATA_DIR, final_name)
+    
     try:
-        with open(dest_path, "wb") as out:
-            shutil.copyfileobj(file.file, out)
+        # Read file content
+        file_content = await file.read()
+        
+        # Create document using the proper model
+        doc_result = document_model.create_document(
+            user_id=current_user["id"],
+            original_name=original_name,
+            file_content=file_content,
+            upload_path=DATA_DIR
+        )
+        
+        # Return metadata with document ID
+        return DocumentMetadata(
+            id=str(doc_result["id"]),
+            name=doc_result["original_name"],
+            size_bytes=doc_result["size_bytes"],
+            modified_at=doc_result["created_at"],
+            path=doc_result["path"],
+            download_url=f"/documents/download/{os.path.basename(doc_result['path'])}"
+        )
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
     finally:
         try:
             await file.close()
         except Exception:
             pass
 
-    meta = build_metadata(dest_path)
-
-    # Record ownership in DB
-    import sqlite3
-    try:
-        with sqlite3.connect(dbm.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO documents (user_id, original_name, stored_name, path, size_bytes)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (current_user["id"], original_name, final_name, dest_path, meta.size_bytes),
-            )
-            conn.commit()
-    except Exception:
-        # Non-fatal: file is saved but DB row failed
-        pass
-
-    return meta
-
 @router.get("/download/{filename}")
 async def download_document(filename: str, current_user: Dict[str, Any] = Depends(get_current_active_user)):
+    """Download a document by filename"""
     safe = sanitize_filename(filename)
-    file_path = os.path.join(DATA_DIR, safe)
-    # Enforce ownership unless admin
-    if not current_user.get("is_admin"):
-        import sqlite3
-        with sqlite3.connect(dbm.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM documents WHERE user_id = ? AND stored_name = ?", (current_user["id"], safe))
-            if cursor.fetchone() is None:
-                raise HTTPException(status_code=403, detail="Not authorized to access this file")
-    if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path, filename=safe)
+    
+    # Find document in database
+    try:
+        # Get all user documents and find the one with matching filename
+        documents = document_model.get_user_documents(current_user["id"])
+        target_doc = None
+        for doc in documents:
+            if os.path.basename(doc["path"]) == safe:
+                target_doc = doc
+                break
+        
+        if not target_doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        file_path = target_doc["path"]
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        
+        return FileResponse(file_path, filename=target_doc["original_name"])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error accessing document: {str(e)}")
 
 @router.delete("/{filename}")
 async def delete_document(filename: str, current_user: Dict[str, Any] = Depends(get_current_active_user)):
+    """Delete a document by filename"""
     safe = sanitize_filename(filename)
-    file_path = os.path.join(DATA_DIR, safe)
-    # Enforce ownership unless admin
-    if not current_user.get("is_admin"):
-        import sqlite3
-        with sqlite3.connect(dbm.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM documents WHERE user_id = ? AND stored_name = ?", (current_user["id"], safe))
-            if cursor.fetchone() is None:
-                raise HTTPException(status_code=403, detail="Not authorized to delete this file")
-    if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+    
     try:
-        os.remove(file_path)
-        # Remove DB entry
-        try:
-            import sqlite3
-            with sqlite3.connect(dbm.db_path) as conn:
-                cursor = conn.cursor()
-                if current_user.get("is_admin"):
-                    cursor.execute("DELETE FROM documents WHERE stored_name = ?", (safe,))
-                else:
-                    cursor.execute("DELETE FROM documents WHERE user_id = ? AND stored_name = ?", (current_user["id"], safe))
-                conn.commit()
-        except Exception:
-            pass
-        return {"status": "deleted", "filename": safe}
+        # Find document in database
+        documents = document_model.get_user_documents(current_user["id"])
+        target_doc = None
+        for doc in documents:
+            if os.path.basename(doc["path"]) == safe:
+                target_doc = doc
+                break
+        
+        if not target_doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Delete from database
+        success = document_model.delete_document(target_doc["id"], current_user["id"])
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete document from database")
+        
+        # Delete file from filesystem
+        file_path = target_doc["path"]
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                # Log but don't fail - database record is already deleted
+                print(f"Warning: Could not delete file {file_path}: {e}")
+        
+        return {"status": "deleted", "filename": safe, "document_id": str(target_doc["id"])}
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")

@@ -2,6 +2,7 @@ import os
 import hashlib
 import re
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 import logging
 
 from app.models.database import DocumentRepository, AnalysisReportRepository
@@ -49,15 +50,23 @@ class Document:
                 checksum=checksum
             )
             
-            return {
-                "id": document_id,
-                "user_id": user_id,
-                "original_name": original_name,
-                "stored_name": stored_name,
-                "path": file_path,
-                "size_bytes": len(file_content),
-                "checksum": checksum
-            }
+            # Fetch the created document to get full data including timestamps
+            created_doc = self.document_repo.get_document(document_id, user_id)
+            if created_doc:
+                return created_doc
+            else:
+                # Fallback if get_document fails
+                return {
+                    "id": document_id,
+                    "user_id": user_id,
+                    "original_name": original_name,
+                    "stored_name": stored_name,
+                    "path": file_path,
+                    "size_bytes": len(file_content),
+                    "checksum": checksum,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat()
+                }
             
         except Exception as e:
             logger.error(f"Error creating document: {str(e)}")
@@ -169,16 +178,25 @@ class AnalysisReport:
                 status="completed"
             )
             
-            return {
-                "id": report_id,
-                "user_id": user_id,
-                "analysis_type": analysis_type,
-                "query": query,
-                "file_name": file_name,
-                "report_path": report_path,
-                "summary": summary,
-                "status": "completed"
-            }
+            # Fetch the complete report data from database to get all fields
+            report_data = self.report_repo.get_report(report_id, user_id)
+            if report_data:
+                return report_data
+            else:
+                # Fallback if get_report fails
+                return {
+                    "id": report_id,
+                    "user_id": user_id,
+                    "analysis_type": analysis_type,
+                    "query": query,
+                    "file_name": file_name,
+                    "report_path": report_path,
+                    "document_id": document_id,
+                    "summary": summary,
+                    "status": "completed",
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                }
             
         except Exception as e:
             logger.error(f"Error creating analysis report: {str(e)}")

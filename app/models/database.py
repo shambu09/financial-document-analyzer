@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 
 
@@ -137,28 +137,28 @@ class AnalysisReportRepository(ABC):
         pass
     
     @abstractmethod
-    def get_report(self, report_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> Optional[Dict[str, Any]]:
         """Get analysis report by ID for a user"""
         pass
     
     @abstractmethod
-    def get_user_reports(self, user_id: int, analysis_type: Optional[str] = None,
+    def get_user_reports(self, user_id: Union[int, str], analysis_type: Optional[str] = None,
                         search_query: Optional[str] = None, limit: int = 50,
                         offset: int = 0) -> List[Dict[str, Any]]:
         """Get analysis reports for a user with filtering"""
         pass
     
     @abstractmethod
-    def update_report(self, report_id: int, user_id: int, **kwargs) -> bool:
+    def update_report(self, report_id: Union[int, str], user_id: Union[int, str], **kwargs) -> bool:
         """Update analysis report"""
         pass
     
     @abstractmethod
-    def delete_report(self, report_id: int, user_id: int) -> bool:
+    def delete_report(self, report_id: Union[int, str], user_id: Union[int, str]) -> bool:
         """Delete analysis report"""
         pass
     
     @abstractmethod
-    def get_reports_count(self, user_id: int, analysis_type: Optional[str] = None) -> int:
+    def get_reports_count(self, user_id: Union[int, str], analysis_type: Optional[str] = None) -> int:
         """Get total count of reports for a user"""
         pass

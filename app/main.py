@@ -38,18 +38,24 @@ def create_app() -> FastAPI:
     # Basic endpoints
     @app.get("/")
     async def root():
+        # Get actual database type being used
+        from app.models.factory import get_model_manager
+        actual_db_type = get_model_manager().db_type
         return {
             "message": f"{app_config['app_name']} is running", 
             "version": app_config["app_version"],
-            "database": db_config["db_type"]
+            "database": actual_db_type
         }
 
     @app.get("/health")
     async def health():
+        # Get actual database type being used
+        from app.models.factory import get_model_manager
+        actual_db_type = get_model_manager().db_type
         return {
             "status": "healthy",
             "version": app_config["app_version"],
-            "database": db_config["db_type"],
+            "database": actual_db_type,
             "available_analysis_types": ["comprehensive", "investment", "risk", "verification"],
         }
 
