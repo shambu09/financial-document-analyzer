@@ -147,3 +147,23 @@ export const reportsAPI = {
   getContent: (reportId: string) => api.get(`/reports/${reportId}/content`),
   getStats: () => api.get('/reports/stats/summary'),
 };
+
+// Tasks API
+export const tasksAPI = {
+  getStatus: (taskId: string) => api.get(`/tasks/${taskId}/status`),
+  cancel: (taskId: string) => api.post(`/tasks/${taskId}/cancel`),
+  getActive: () => api.get('/tasks/active'),
+  getStats: () => api.get('/tasks/stats'),
+  getQueueInfo: () => api.get('/tasks/queues'),
+};
+
+// Task Mappings API
+export const taskMappingsAPI = {
+  getByTaskId: (taskId: string) => api.get(`/task-mappings/by-task/${taskId}`),
+  getByReportId: (reportId: string) => api.get(`/task-mappings/by-report/${reportId}`),
+  getUserMappings: (params?: { page?: number; page_size?: number }) =>
+    api.get('/task-mappings/', { params }),
+  deleteByTaskId: (taskId: string) => api.delete(`/task-mappings/by-task/${taskId}`),
+  deleteByReportId: (reportId: string) => api.delete(`/task-mappings/by-report/${reportId}`),
+  cleanup: (daysOld?: number) => api.post('/task-mappings/cleanup', null, { params: { days_old: daysOld } }),
+};

@@ -80,6 +80,42 @@ export interface AnalysisReportUpdate {
   summary?: string;
 }
 
+// Task types
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'retrying' | 'cancelled';
+
+export interface TaskInfo {
+  task_id: string;
+  status: TaskStatus;
+  result?: any;
+  traceback?: string;
+  children?: TaskInfo[];
+  date_done?: string;
+  task_name?: string;
+  args?: any[];
+  kwargs?: Record<string, any>;
+  worker?: string;
+  retries?: number;
+  queue?: string;
+}
+
+export interface TaskReportMapping {
+  id: string;
+  task_id: string;
+  report_id: string;
+  user_id: string;
+  analysis_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskReportMappingListResponse {
+  mappings: TaskReportMapping[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 // API Error types
 export interface ValidationError {
   loc: (string | number)[];
