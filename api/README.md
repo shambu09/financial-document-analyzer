@@ -184,6 +184,50 @@ GET    /reports/{id}/content       # Get report content
 DELETE /reports/{id}               # Delete report
 ```
 
+#### Task Management & Progress APIs
+```
+GET  /tasks/{task_id}/status       # Get task status and progress
+POST /tasks/{task_id}/cancel       # Cancel running task
+GET  /tasks/active                 # List active tasks
+GET  /tasks/stats                  # Get task statistics
+GET  /tasks/queues                 # Get queue information
+```
+
+#### Task-Report Mapping APIs
+```
+GET  /task-mappings/by-task/{task_id}     # Get mapping by task ID
+GET  /task-mappings/by-report/{report_id} # Get mapping by report ID
+GET  /task-mappings/                      # List user mappings
+DELETE /task-mappings/by-task/{task_id}   # Delete mapping by task ID
+DELETE /task-mappings/by-report/{report_id} # Delete mapping by report ID
+POST /task-mappings/cleanup               # Cleanup old mappings (admin)
+```
+
+### Background Task Processing
+
+The system uses **Celery** for asynchronous task processing with Redis as the message broker:
+
+#### Task Status Values
+- **PENDING**: Task queued, waiting to be processed
+- **STARTED**: Task execution started
+- **SUCCESS**: Task completed successfully
+- **FAILURE**: Task failed with error
+- **RETRY**: Task being retried after failure
+- **REVOKED**: Task cancelled/revoked
+
+#### Report Status Values
+- **pending**: Report waiting for analysis
+- **in_progress**: Analysis currently running
+- **completed**: Analysis finished successfully
+- **failed**: Analysis failed with error
+
+#### Real-time Progress Tracking
+- **Polling**: Automatic status updates every 5 seconds
+- **Progress**: Percentage completion (0-100)
+- **Messages**: Current operation description
+- **Error Handling**: Detailed error information
+- **Auto-stop**: Stops polling when task completes
+
 ## Database Design
 
 ### Multi-Database Architecture
@@ -392,13 +436,15 @@ The system leverages CrewAI for AI agent orchestration:
 - Clean separation of database-specific logic
 - Future extensibility for additional databases
 
-### 2. **Asynchronous Background Processing**
-**Decision**: FastAPI BackgroundTasks with ThreadPoolExecutor
+### 2. **Distributed Task Processing with Celery**
+**Decision**: Celery with Redis message broker for background task processing
 **Rationale**:
-- Non-blocking API responses
-- Better user experience
-- Scalable processing for multiple concurrent analyses
-- Resource management for CPU-intensive operations
+- **Scalability**: Horizontal scaling across multiple workers
+- **Reliability**: Task persistence and retry mechanisms
+- **Monitoring**: Real-time task status and progress tracking
+- **Fault Tolerance**: Automatic retry with exponential backoff
+- **Resource Management**: Efficient CPU and memory utilization
+- **Production Ready**: Battle-tested distributed task queue
 
 ### 3. **CrewAI Agent Framework**
 **Decision**: Specialized financial agents with specific roles
@@ -432,6 +478,109 @@ The system leverages CrewAI for AI agent orchestration:
 - User-friendly file upload experience
 - Future extensibility for new formats
 
+## Celery Task Processing Architecture
+
+### Message Queue Design
+
+The system implements a robust distributed task processing architecture using **Celery** with **Redis** as the message broker:
+
+#### **Core Components**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   FastAPI API   │───▶│  Redis Broker   │───▶│ Celery Workers  │
+│                 │    │                 │    │                 │
+│ - Task Creation │    │ - Message Queue │    │ - Task Execution│
+│ - Status Query  │    │ - Task Storage  │    │ - Progress Update│
+│ - Result Return │    │ - Result Cache  │    │ - Error Handling│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       ▼
+         │                       │              ┌─────────────────┐
+         │                       │              │   Flower UI     │
+         │                       │              │                 │
+         │                       │              │ - Task Monitor  │
+         │                       │              │ - Worker Stats  │
+         │                       │              │ - Queue Status  │
+         │                       │              └─────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ Task-Report     │    │   Database      │
+│ Mapping Table   │    │                 │
+│                 │    │ - Task Results  │
+│ - Task ID       │    │ - Report Data   │
+│ - Report ID     │    │ - Status Info   │
+│ - User ID       │    │ - Progress Log  │
+└─────────────────┘    └─────────────────┘
+```
+
+#### **Task Processing Flow**
+
+1. **Task Submission**
+   - API receives analysis request
+   - Creates analysis report with `PENDING` status
+   - Enqueues Celery task with task metadata
+   - Creates task-report mapping entry
+   - Returns task ID and status URLs to client
+
+2. **Task Execution**
+   - Celery worker picks up task from Redis queue
+   - Updates report status to `IN_PROGRESS`
+   - Executes CrewAI analysis with progress callbacks
+   - Handles errors with automatic retry logic
+   - Updates report with results or failure status
+
+3. **Status Monitoring**
+   - Client polls task status endpoint
+   - Real-time progress updates (0-100%)
+   - Automatic polling stops on completion
+   - Error details and retry information
+
+#### **Queue Configuration**
+
+```python
+# Task routing by analysis type
+task_routes = {
+    'app.celery_tasks.process_comprehensive_analysis_task': {'queue': 'analysis'},
+    'app.celery_tasks.process_investment_analysis_task': {'queue': 'analysis'},
+    'app.celery_tasks.process_risk_analysis_task': {'queue': 'analysis'},
+    'app.celery_tasks.process_verification_analysis_task': {'queue': 'analysis'},
+}
+```
+
+#### **Worker Configuration**
+
+- **Concurrency**: Configurable worker processes
+- **Memory Management**: Automatic garbage collection
+- **Error Handling**: Exponential backoff retry (3 attempts)
+- **Time Limits**: 10-minute hard limit, 9-minute soft limit
+- **Resource Monitoring**: CPU and memory usage tracking
+
+#### **Monitoring & Observability**
+
+- **Flower Dashboard**: Real-time task monitoring
+- **Task Statistics**: Worker performance metrics
+- **Queue Health**: Redis queue length monitoring
+- **Error Tracking**: Detailed error logs and stack traces
+- **Progress Tracking**: Granular progress updates
+
+#### **Scalability Features**
+
+- **Horizontal Scaling**: Add more workers as needed
+- **Load Balancing**: Automatic task distribution
+- **Fault Tolerance**: Worker failure recovery
+- **Resource Isolation**: Separate queues for different task types
+- **Auto-scaling**: Dynamic worker scaling based on queue length
+
+#### **Data Persistence**
+
+- **Task State**: Stored in Redis for fast access
+- **Results**: Cached in Redis with TTL
+- **Mappings**: Stored in database for persistence
+- **Progress**: Real-time updates via Redis
+- **Logs**: Comprehensive logging for debugging
+
 ## Technology Stack
 
 ### Backend Framework
@@ -451,6 +600,13 @@ The system leverages CrewAI for AI agent orchestration:
 - **MongoDB**: Production and scalable deployment
 - **Motor**: Async MongoDB driver
 - **File System**: Local file storage with organized structure
+
+### Task Processing & Message Queues
+- **Celery**: Distributed task queue for background processing
+- **Redis**: Message broker and result backend
+- **Flower**: Real-time task monitoring dashboard
+- **Task Routing**: Queue-based task distribution
+- **Progress Tracking**: Real-time status and progress updates
 
 ### Security & Authentication
 - **JWT**: JSON Web Token authentication
