@@ -252,3 +252,32 @@ class HealthResponse(BaseModel):
 class RootResponse(BaseModel):
     message: str
     version: str
+
+
+# Task-Report Mapping Schemas
+class TaskReportMappingBase(BaseModel):
+    task_id: str
+    report_id: str
+    user_id: str
+    analysis_type: str
+
+
+class TaskReportMappingCreate(TaskReportMappingBase):
+    pass
+
+
+class TaskReportMappingResponse(TaskReportMappingBase):
+    id: str  # String ID for all databases
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TaskReportMappingListResponse(BaseModel):
+    mappings: List[TaskReportMappingResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

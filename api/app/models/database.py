@@ -162,3 +162,47 @@ class AnalysisReportRepository(ABC):
     def get_reports_count(self, user_id: str, analysis_type: Optional[str] = None) -> int:
         """Get total count of reports for a user"""
         pass
+
+
+class TaskReportMappingRepository(ABC):
+    """Abstract repository for task-report mapping operations"""
+    
+    @abstractmethod
+    def create_mapping(self, task_id: str, report_id: str, user_id: str, analysis_type: str) -> str:
+        """Create a new task-report mapping and return mapping ID"""
+        pass
+    
+    @abstractmethod
+    def get_mapping_by_task_id(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by task ID"""
+        pass
+    
+    @abstractmethod
+    def get_mapping_by_report_id(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by report ID"""
+        pass
+    
+    @abstractmethod
+    def get_user_mappings(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get task-report mappings for a user"""
+        pass
+    
+    @abstractmethod
+    def delete_mapping(self, mapping_id: str) -> bool:
+        """Delete task-report mapping"""
+        pass
+    
+    @abstractmethod
+    def delete_mapping_by_task_id(self, task_id: str) -> bool:
+        """Delete mapping by task ID"""
+        pass
+    
+    @abstractmethod
+    def delete_mapping_by_report_id(self, report_id: str) -> bool:
+        """Delete mapping by report ID"""
+        pass
+    
+    @abstractmethod
+    def cleanup_old_mappings(self, days_old: int = 30) -> int:
+        """Clean up old mappings and return count of cleaned mappings"""
+        pass

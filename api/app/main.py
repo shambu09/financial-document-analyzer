@@ -6,6 +6,8 @@ from app.api.routers.auth import router as auth_router
 from app.api.routers.documents import router as documents_router
 from app.api.routers.analysis import router as analysis_router
 from app.api.routers.reports import router as reports_router
+from app.api.routers.tasks import router as tasks_router
+from app.api.routers.task_mappings import router as task_mappings_router
 from app.config import DatabaseConfig
 
 
@@ -34,6 +36,8 @@ def create_app() -> FastAPI:
     app.include_router(documents_router)
     app.include_router(analysis_router)
     app.include_router(reports_router)
+    app.include_router(tasks_router)
+    app.include_router(task_mappings_router)
 
     # Basic endpoints
     @app.get("/")

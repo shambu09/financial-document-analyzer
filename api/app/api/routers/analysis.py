@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse
 import os
 import uuid
@@ -13,7 +13,7 @@ from app.api.routers.auth import get_current_active_user
 from app.models.auth import User, DatabaseManager, AnalysisReport
 from app.models.factory import get_document_model, get_analysis_report_model
 from app.models.schemas import ReportStatus
-from app.services.background_tasks import get_analysis_task
+from app.celery_tasks import get_celery_task
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -93,7 +93,6 @@ def save_analysis_report(
 
 @router.post("/comprehensive")
 async def analyze_comprehensive(
-    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for comprehensive insights"),
     file: Optional[UploadFile] = File(None),
     document_id: Optional[str] = Form(None),
@@ -163,15 +162,25 @@ async def analyze_comprehensive(
         )
         report_id = report_data["id"] if isinstance(report_data, dict) else report_data
         
-        # Start background task
-        background_tasks.add_task(
-            get_analysis_task("comprehensive"),
+        # Start Celery task
+        celery_task = get_celery_task("comprehensive")
+        task = celery_task.delay(
             report_id=report_id,
             query=query.strip(),
             file_path=file_path,
             file_name=file_name,
             user_id=current_user["id"],
             document_id=document_id
+        )
+        
+        # Create task-report mapping
+        from app.models.factory import get_task_report_mapping_model
+        mapping_model = get_task_report_mapping_model()
+        mapping_model.create_mapping(
+            task_id=task.id,
+            report_id=report_id,
+            user_id=current_user["id"],
+            analysis_type="comprehensive"
         )
         
         return {
@@ -181,8 +190,10 @@ async def analyze_comprehensive(
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
+            "task_id": task.id,
             "report_status": ReportStatus.PENDING.value,
             "report_download_url": f"/reports/{report_id}/download",
+            "task_status_url": f"/tasks/{task.id}/status",
             "message": "Analysis has been queued and will be processed in the background"
         }
         
@@ -197,7 +208,6 @@ async def analyze_comprehensive(
 
 @router.post("/investment")
 async def analyze_investment(
-    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for investment opportunities"),
     file: Optional[UploadFile] = File(None),
     document_id: Optional[str] = Form(None),
@@ -267,15 +277,25 @@ async def analyze_investment(
         )
         report_id = report_data["id"] if isinstance(report_data, dict) else report_data
         
-        # Start background task
-        background_tasks.add_task(
-            get_analysis_task("investment"),
+        # Start Celery task
+        celery_task = get_celery_task("investment")
+        task = celery_task.delay(
             report_id=report_id,
             query=query.strip(),
             file_path=file_path,
             file_name=file_name,
             user_id=current_user["id"],
             document_id=document_id
+        )
+        
+        # Create task-report mapping
+        from app.models.factory import get_task_report_mapping_model
+        mapping_model = get_task_report_mapping_model()
+        mapping_model.create_mapping(
+            task_id=task.id,
+            report_id=report_id,
+            user_id=current_user["id"],
+            analysis_type="investment"
         )
         
         return {
@@ -285,8 +305,10 @@ async def analyze_investment(
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
+            "task_id": task.id,
             "report_status": ReportStatus.PENDING.value,
             "report_download_url": f"/reports/{report_id}/download",
+            "task_status_url": f"/tasks/{task.id}/status",
             "message": "Investment analysis has been queued and will be processed in the background"
         }
         
@@ -303,7 +325,6 @@ async def analyze_investment(
 
 @router.post("/risk")
 async def analyze_risk(
-    background_tasks: BackgroundTasks,
     query: str = Form(default="Analyze this financial document for risk assessment"),
     file: Optional[UploadFile] = File(None),
     document_id: Optional[str] = Form(None),
@@ -373,15 +394,25 @@ async def analyze_risk(
         )
         report_id = report_data["id"] if isinstance(report_data, dict) else report_data
         
-        # Start background task
-        background_tasks.add_task(
-            get_analysis_task("risk"),
+        # Start Celery task
+        celery_task = get_celery_task("risk")
+        task = celery_task.delay(
             report_id=report_id,
             query=query.strip(),
             file_path=file_path,
             file_name=file_name,
             user_id=current_user["id"],
             document_id=document_id
+        )
+        
+        # Create task-report mapping
+        from app.models.factory import get_task_report_mapping_model
+        mapping_model = get_task_report_mapping_model()
+        mapping_model.create_mapping(
+            task_id=task.id,
+            report_id=report_id,
+            user_id=current_user["id"],
+            analysis_type="risk"
         )
         
         return {
@@ -391,8 +422,10 @@ async def analyze_risk(
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
+            "task_id": task.id,
             "report_status": ReportStatus.PENDING.value,
             "report_download_url": f"/reports/{report_id}/download",
+            "task_status_url": f"/tasks/{task.id}/status",
             "message": "Risk analysis has been queued and will be processed in the background"
         }
         
@@ -409,7 +442,6 @@ async def analyze_risk(
 
 @router.post("/verify")
 async def verify_document(
-    background_tasks: BackgroundTasks,
     query: str = Form(default="Verify if this is a valid financial document"),
     file: Optional[UploadFile] = File(None),
     document_id: Optional[str] = Form(None),
@@ -479,15 +511,25 @@ async def verify_document(
         )
         report_id = report_data["id"] if isinstance(report_data, dict) else report_data
         
-        # Start background task
-        background_tasks.add_task(
-            get_analysis_task("verification"),
+        # Start Celery task
+        celery_task = get_celery_task("verification")
+        task = celery_task.delay(
             report_id=report_id,
             query=query.strip(),
             file_path=file_path,
             file_name=file_name,
             user_id=current_user["id"],
             document_id=document_id
+        )
+        
+        # Create task-report mapping
+        from app.models.factory import get_task_report_mapping_model
+        mapping_model = get_task_report_mapping_model()
+        mapping_model.create_mapping(
+            task_id=task.id,
+            report_id=report_id,
+            user_id=current_user["id"],
+            analysis_type="verification"
         )
         
         return {
@@ -497,8 +539,10 @@ async def verify_document(
             "file_processed": file_name,
             "user_id": current_user["id"],
             "report_id": report_id,
+            "task_id": task.id,
             "report_status": ReportStatus.PENDING.value,
             "report_download_url": f"/reports/{report_id}/download",
+            "task_status_url": f"/tasks/{task.id}/status",
             "message": "Verification analysis has been queued and will be processed in the background"
         }
         

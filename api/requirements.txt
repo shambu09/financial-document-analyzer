@@ -54,3 +54,6 @@ pydantic
 pydantic_core
 pymongo
 motor
+celery
+redis
+flower

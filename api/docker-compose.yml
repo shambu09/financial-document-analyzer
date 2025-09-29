@@ -1,0 +1,167 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: financial_analyzer_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: financial_analyzer
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb-init:/docker-entrypoint-initdb.d
+    networks:
+      - financial_analyzer_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # MongoDB Web Interface
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: financial_analyzer_mongo_express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongodb:27017/
+      ME_CONFIG_BASICAUTH: false
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - financial_analyzer_network
+
+  # Redis Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: financial_analyzer_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - financial_analyzer_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery Worker for Background Tasks
+  celery-worker:
+    build: .
+    container_name: financial_analyzer_celery_worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 --queues=analysis,celery --hostname=worker@%h
+    volumes:
+      - .:/app
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_TYPE=mongodb
+      - MONGODB_CONNECTION_STRING=mongodb://admin:password123@mongodb:27017/
+      - MONGODB_DATABASE_NAME=financial_analyzer
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - financial_analyzer_network
+    restart: unless-stopped
+
+  # Celery Flower Monitoring
+  celery-flower:
+    build: .
+    container_name: financial_analyzer_flower
+    command: celery -A app.celery_app flower --port=5555 --broker=redis://redis:6379/0 --basic_auth=admin:admin
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - financial_analyzer_network
+    restart: unless-stopped
+
+  # FastAPI Application
+  api:
+    build: .
+    container_name: financial_analyzer_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_TYPE=mongodb
+      - MONGODB_CONNECTION_STRING=mongodb://admin:password123@mongodb:27017/
+      - MONGODB_DATABASE_NAME=financial_analyzer
+      - JWT_SECRET_KEY=your-secret-key-change-this-in-production
+      - DEBUG=true
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      celery-worker:
+        condition: service_started
+    networks:
+      - financial_analyzer_network
+    restart: unless-stopped
+
+  # Optional: Additional Celery Workers for Scaling
+  celery-worker-2:
+    build: .
+    container_name: financial_analyzer_celery_worker_2
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 --queues=analysis,celery --hostname=worker2@%h
+    volumes:
+      - .:/app
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_TYPE=mongodb
+      - MONGODB_CONNECTION_STRING=mongodb://admin:password123@mongodb:27017/
+      - MONGODB_DATABASE_NAME=financial_analyzer
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - financial_analyzer_network
+    restart: unless-stopped
+    profiles:
+      - scaling
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  financial_analyzer_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

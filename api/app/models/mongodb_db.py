@@ -55,7 +55,7 @@ class MongoDBDatabase(DatabaseInterface):
         """Initialize collections and indexes"""
         try:
             # Create collections
-            collections = ['users', 'sessions', 'refresh_tokens', 'documents', 'analysis_reports']
+            collections = ['users', 'sessions', 'refresh_tokens', 'documents', 'analysis_reports', 'task_report_mappings']
             
             for collection_name in collections:
                 if collection_name not in await self.db.list_collection_names():
@@ -101,6 +101,13 @@ class MongoDBDatabase(DatabaseInterface):
             await self.db.analysis_reports.create_index("analysis_type")
             await self.db.analysis_reports.create_index("created_at")
             await self.db.analysis_reports.create_index([("user_id", 1), ("analysis_type", 1)])
+            
+            # Task-report mappings collection indexes
+            await self.db.task_report_mappings.create_index("task_id", unique=True)
+            await self.db.task_report_mappings.create_index("report_id")
+            await self.db.task_report_mappings.create_index("user_id")
+            await self.db.task_report_mappings.create_index("analysis_type")
+            await self.db.task_report_mappings.create_index("created_at")
             
         except Exception as e:
             logger.error(f"Error creating indexes: {str(e)}")
@@ -800,4 +807,185 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             "summary": report_doc.get("summary"),
             "created_at": report_doc["created_at"],
             "updated_at": report_doc["updated_at"]
+        }
+
+
+class MongoDBTaskReportMappingRepository(TaskReportMappingRepository):
+    """MongoDB implementation of TaskReportMappingRepository"""
+    
+    def __init__(self, db: MongoDBDatabase):
+        self.db = db
+    
+    def create_mapping(self, task_id: str, report_id: str, user_id: str, analysis_type: str) -> str:
+        """Create a new task-report mapping and return mapping ID"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._create_mapping_async(task_id, report_id, user_id, analysis_type))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error creating task-report mapping: {str(e)}")
+            raise
+    
+    async def _create_mapping_async(self, task_id: str, report_id: str, user_id: str, analysis_type: str) -> str:
+        """Async implementation of create_mapping"""
+        mapping_doc = {
+            "task_id": task_id,
+            "report_id": str(report_id),
+            "user_id": str(user_id),
+            "analysis_type": analysis_type,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        
+        result = await self.db.db.task_report_mappings.insert_one(mapping_doc)
+        return result.inserted_id
+    
+    def get_mapping_by_task_id(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by task ID"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._get_mapping_by_task_id_async(task_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error getting mapping by task ID: {str(e)}")
+            raise
+    
+    async def _get_mapping_by_task_id_async(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Async implementation of get_mapping_by_task_id"""
+        mapping_doc = await self.db.db.task_report_mappings.find_one({"task_id": task_id})
+        if mapping_doc:
+            return self._convert_mapping_doc(mapping_doc)
+        return None
+    
+    def get_mapping_by_report_id(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by report ID"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._get_mapping_by_report_id_async(report_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error getting mapping by report ID: {str(e)}")
+            raise
+    
+    async def _get_mapping_by_report_id_async(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """Async implementation of get_mapping_by_report_id"""
+        mapping_doc = await self.db.db.task_report_mappings.find_one({"report_id": str(report_id)})
+        if mapping_doc:
+            return self._convert_mapping_doc(mapping_doc)
+        return None
+    
+    def get_user_mappings(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get task-report mappings for a user"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._get_user_mappings_async(user_id, limit, offset))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error getting user mappings: {str(e)}")
+            raise
+    
+    async def _get_user_mappings_async(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Async implementation of get_user_mappings"""
+        cursor = self.db.db.task_report_mappings.find({"user_id": str(user_id)}).sort("created_at", -1).skip(offset).limit(limit)
+        mappings = []
+        async for mapping_doc in cursor:
+            mappings.append(self._convert_mapping_doc(mapping_doc))
+        return mappings
+    
+    def delete_mapping(self, mapping_id: str) -> bool:
+        """Delete task-report mapping"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._delete_mapping_async(mapping_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error deleting mapping: {str(e)}")
+            raise
+    
+    async def _delete_mapping_async(self, mapping_id: str) -> bool:
+        """Async implementation of delete_mapping"""
+        result = await self.db.db.task_report_mappings.delete_one({"_id": ObjectId(str(mapping_id))})
+        return result.deleted_count > 0
+    
+    def delete_mapping_by_task_id(self, task_id: str) -> bool:
+        """Delete mapping by task ID"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._delete_mapping_by_task_id_async(task_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error deleting mapping by task ID: {str(e)}")
+            raise
+    
+    async def _delete_mapping_by_task_id_async(self, task_id: str) -> bool:
+        """Async implementation of delete_mapping_by_task_id"""
+        result = await self.db.db.task_report_mappings.delete_one({"task_id": task_id})
+        return result.deleted_count > 0
+    
+    def delete_mapping_by_report_id(self, report_id: str) -> bool:
+        """Delete mapping by report ID"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._delete_mapping_by_report_id_async(report_id))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error deleting mapping by report ID: {str(e)}")
+            raise
+    
+    async def _delete_mapping_by_report_id_async(self, report_id: str) -> bool:
+        """Async implementation of delete_mapping_by_report_id"""
+        result = await self.db.db.task_report_mappings.delete_one({"report_id": str(report_id)})
+        return result.deleted_count > 0
+    
+    def cleanup_old_mappings(self, days_old: int = 30) -> int:
+        """Clean up old mappings and return count of cleaned mappings"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._cleanup_old_mappings_async(days_old))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error cleaning up old mappings: {str(e)}")
+            raise
+    
+    async def _cleanup_old_mappings_async(self, days_old: int = 30) -> int:
+        """Async implementation of cleanup_old_mappings"""
+        from datetime import timedelta
+        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        result = await self.db.db.task_report_mappings.delete_many({"created_at": {"$lt": cutoff_date}})
+        return result.deleted_count
+    
+    def _convert_mapping_doc(self, mapping_doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert MongoDB document to standard format"""
+        return {
+            "id": str(mapping_doc["_id"]),
+            "task_id": mapping_doc["task_id"],
+            "report_id": mapping_doc["report_id"],
+            "user_id": mapping_doc["user_id"],
+            "analysis_type": mapping_doc["analysis_type"],
+            "created_at": mapping_doc["created_at"],
+            "updated_at": mapping_doc["updated_at"]
         }

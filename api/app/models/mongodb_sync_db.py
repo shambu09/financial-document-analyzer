@@ -17,7 +17,7 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 
 from app.models.database import (
     DatabaseInterface, UserRepository, SessionRepository, 
-    DocumentRepository, AnalysisReportRepository
+    DocumentRepository, AnalysisReportRepository, TaskReportMappingRepository
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class MongoDBDatabase(DatabaseInterface):
     
     def _create_collections(self):
         """Create required collections"""
-        collections = ['users', 'sessions', 'refresh_tokens', 'documents', 'analysis_reports']
+        collections = ['users', 'sessions', 'refresh_tokens', 'documents', 'analysis_reports', 'task_report_mappings']
         for collection_name in collections:
             if collection_name not in self.db.list_collection_names():
                 self.db.create_collection(collection_name)
@@ -85,6 +85,13 @@ class MongoDBDatabase(DatabaseInterface):
             self.db.analysis_reports.create_index("document_id")
             self.db.analysis_reports.create_index("analysis_type")
             self.db.analysis_reports.create_index("created_at")
+            
+            # Task-report mappings collection indexes
+            self.db.task_report_mappings.create_index("task_id", unique=True)
+            self.db.task_report_mappings.create_index("report_id")
+            self.db.task_report_mappings.create_index("user_id")
+            self.db.task_report_mappings.create_index("analysis_type")
+            self.db.task_report_mappings.create_index("created_at")
             
             logger.info("Database indexes created successfully")
             
@@ -514,4 +521,113 @@ class MongoDBAnalysisReportRepository(AnalysisReportRepository):
             "status": report_doc.get("status", "completed"),
             "created_at": report_doc["created_at"].isoformat() if isinstance(report_doc["created_at"], datetime) else str(report_doc["created_at"]),
             "updated_at": report_doc["updated_at"].isoformat() if isinstance(report_doc["updated_at"], datetime) else str(report_doc["updated_at"])
+        }
+
+
+class MongoDBTaskReportMappingRepository(TaskReportMappingRepository):
+    """MongoDB implementation of TaskReportMappingRepository (Synchronous)"""
+    
+    def __init__(self, db: MongoDBDatabase):
+        self.db = db
+    
+    def create_mapping(self, task_id: str, report_id: str, user_id: str, analysis_type: str) -> str:
+        """Create a new task-report mapping and return mapping ID"""
+        try:
+            mapping_doc = {
+                "task_id": task_id,
+                "report_id": str(report_id),
+                "user_id": str(user_id),
+                "analysis_type": analysis_type,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+            
+            result = self.db.db.task_report_mappings.insert_one(mapping_doc)
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Error creating task-report mapping: {str(e)}")
+            raise
+    
+    def get_mapping_by_task_id(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by task ID"""
+        try:
+            mapping_doc = self.db.db.task_report_mappings.find_one({"task_id": task_id})
+            if mapping_doc:
+                return self._convert_mapping_doc(mapping_doc)
+            return None
+        except Exception as e:
+            logger.error(f"Error getting mapping by task ID: {str(e)}")
+            raise
+    
+    def get_mapping_by_report_id(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by report ID"""
+        try:
+            mapping_doc = self.db.db.task_report_mappings.find_one({"report_id": str(report_id)})
+            if mapping_doc:
+                return self._convert_mapping_doc(mapping_doc)
+            return None
+        except Exception as e:
+            logger.error(f"Error getting mapping by report ID: {str(e)}")
+            raise
+    
+    def get_user_mappings(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get task-report mappings for a user"""
+        try:
+            cursor = self.db.db.task_report_mappings.find({"user_id": str(user_id)}).sort("created_at", -1).skip(offset).limit(limit)
+            mappings = []
+            for mapping_doc in cursor:
+                mappings.append(self._convert_mapping_doc(mapping_doc))
+            return mappings
+        except Exception as e:
+            logger.error(f"Error getting user mappings: {str(e)}")
+            raise
+    
+    def delete_mapping(self, mapping_id: str) -> bool:
+        """Delete task-report mapping"""
+        try:
+            result = self.db.db.task_report_mappings.delete_one({"_id": ObjectId(str(mapping_id))})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping: {str(e)}")
+            raise
+    
+    def delete_mapping_by_task_id(self, task_id: str) -> bool:
+        """Delete mapping by task ID"""
+        try:
+            result = self.db.db.task_report_mappings.delete_one({"task_id": task_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping by task ID: {str(e)}")
+            raise
+    
+    def delete_mapping_by_report_id(self, report_id: str) -> bool:
+        """Delete mapping by report ID"""
+        try:
+            result = self.db.db.task_report_mappings.delete_one({"report_id": str(report_id)})
+            return result.deleted_count > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping by report ID: {str(e)}")
+            raise
+    
+    def cleanup_old_mappings(self, days_old: int = 30) -> int:
+        """Clean up old mappings and return count of cleaned mappings"""
+        try:
+            from datetime import timedelta
+            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            result = self.db.db.task_report_mappings.delete_many({"created_at": {"$lt": cutoff_date}})
+            return result.deleted_count
+        except Exception as e:
+            logger.error(f"Error cleaning up old mappings: {str(e)}")
+            raise
+    
+    def _convert_mapping_doc(self, mapping_doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert MongoDB document to standard format"""
+        return {
+            "id": str(mapping_doc["_id"]),
+            "task_id": mapping_doc["task_id"],
+            "report_id": mapping_doc["report_id"],
+            "user_id": mapping_doc["user_id"],
+            "analysis_type": mapping_doc["analysis_type"],
+            "created_at": mapping_doc["created_at"].isoformat() if isinstance(mapping_doc["created_at"], datetime) else str(mapping_doc["created_at"]),
+            "updated_at": mapping_doc["updated_at"].isoformat() if isinstance(mapping_doc["updated_at"], datetime) else str(mapping_doc["updated_at"])
         }

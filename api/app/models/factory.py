@@ -1,17 +1,18 @@
 from typing import Dict, Any
 import logging
 
-from app.models.database import DatabaseInterface, UserRepository, SessionRepository, DocumentRepository, AnalysisReportRepository
+from app.models.database import DatabaseInterface, UserRepository, SessionRepository, DocumentRepository, AnalysisReportRepository, TaskReportMappingRepository
 from app.models.sqlite_db import (
     SQLiteDatabase, SQLiteUserRepository, SQLiteSessionRepository, 
-    SQLiteDocumentRepository, SQLiteAnalysisReportRepository
+    SQLiteDocumentRepository, SQLiteAnalysisReportRepository, SQLiteTaskReportMappingRepository
 )
 from app.models.mongodb_sync_db import (
     MongoDBDatabase, MongoDBUserRepository, MongoDBSessionRepository,
-    MongoDBDocumentRepository, MongoDBAnalysisReportRepository
+    MongoDBDocumentRepository, MongoDBAnalysisReportRepository, MongoDBTaskReportMappingRepository
 )
 from app.models.auth_models import User, Session
 from app.models.document_models import Document, AnalysisReport
+from app.models.task_report_mapping_models import TaskReportMapping
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,16 @@ class DatabaseFactory:
                 "user_repo": SQLiteUserRepository(db),
                 "session_repo": SQLiteSessionRepository(db),
                 "document_repo": SQLiteDocumentRepository(db),
-                "analysis_report_repo": SQLiteAnalysisReportRepository(db)
+                "analysis_report_repo": SQLiteAnalysisReportRepository(db),
+                "task_report_mapping_repo": SQLiteTaskReportMappingRepository(db)
             }
         elif isinstance(db, MongoDBDatabase):
             return {
                 "user_repo": MongoDBUserRepository(db),
                 "session_repo": MongoDBSessionRepository(db),
                 "document_repo": MongoDBDocumentRepository(db),
-                "analysis_report_repo": MongoDBAnalysisReportRepository(db)
+                "analysis_report_repo": MongoDBAnalysisReportRepository(db),
+                "task_report_mapping_repo": MongoDBTaskReportMappingRepository(db)
             }
         else:
             raise ValueError(f"Unsupported database type: {type(db)}")
@@ -59,7 +62,8 @@ class DatabaseFactory:
             "user": User(repositories["user_repo"], repositories["session_repo"]),
             "session": Session(repositories["session_repo"]),
             "document": Document(repositories["document_repo"]),
-            "analysis_report": AnalysisReport(repositories["analysis_report_repo"])
+            "analysis_report": AnalysisReport(repositories["analysis_report_repo"]),
+            "task_report_mapping": TaskReportMapping(repositories["task_report_mapping_repo"])
         }
 
 
@@ -89,6 +93,10 @@ class ModelManager:
     def get_analysis_report_model(self) -> AnalysisReport:
         """Get analysis report model instance"""
         return self.models["analysis_report"]
+    
+    def get_task_report_mapping_model(self) -> TaskReportMapping:
+        """Get task-report mapping model instance"""
+        return self.models["task_report_mapping"]
     
     def get_database(self) -> DatabaseInterface:
         """Get database instance"""
@@ -147,3 +155,8 @@ def get_document_model() -> Document:
 def get_analysis_report_model() -> AnalysisReport:
     """Get analysis report model instance"""
     return get_model_manager().get_analysis_report_model()
+
+
+def get_task_report_mapping_model() -> TaskReportMapping:
+    """Get task-report mapping model instance"""
+    return get_model_manager().get_task_report_mapping_model()

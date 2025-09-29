@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any, List, Union
 
 from app.models.database import (
     DatabaseInterface, UserRepository, SessionRepository, 
-    DocumentRepository, AnalysisReportRepository
+    DocumentRepository, AnalysisReportRepository, TaskReportMappingRepository
 )
 
 logger = logging.getLogger(__name__)
@@ -108,6 +108,23 @@ class SQLiteDatabase(DatabaseInterface):
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (user_id) REFERENCES users (id),
                         FOREIGN KEY (document_id) REFERENCES documents (id)
+                    )
+                    """
+                )
+                
+                # Create task_report_mappings table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS task_report_mappings (
+                        id TEXT PRIMARY KEY,
+                        task_id TEXT NOT NULL UNIQUE,
+                        report_id TEXT NOT NULL,
+                        user_id TEXT NOT NULL,
+                        analysis_type TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (id),
+                        FOREIGN KEY (report_id) REFERENCES analysis_reports (id)
                     )
                     """
                 )
@@ -753,4 +770,183 @@ class SQLiteAnalysisReportRepository(AnalysisReportRepository):
                 return cursor.fetchone()[0]
         except Exception as e:
             logger.error(f"Error getting analysis reports count: {str(e)}")
+            raise
+
+
+class SQLiteTaskReportMappingRepository(TaskReportMappingRepository):
+    """SQLite implementation of TaskReportMappingRepository"""
+    
+    def __init__(self, db: SQLiteDatabase):
+        self.db = db
+    
+    def create_mapping(self, task_id: str, report_id: str, user_id: str, analysis_type: str) -> str:
+        """Create a new task-report mapping and return mapping ID"""
+        try:
+            mapping_id = str(uuid.uuid4())
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO task_report_mappings 
+                    (id, task_id, report_id, user_id, analysis_type)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (mapping_id, task_id, report_id, user_id, analysis_type)
+                )
+                conn.commit()
+                return mapping_id
+        except Exception as e:
+            logger.error(f"Error creating task-report mapping: {str(e)}")
+            raise
+    
+    def get_mapping_by_task_id(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by task ID"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT id, task_id, report_id, user_id, analysis_type, created_at, updated_at
+                    FROM task_report_mappings 
+                    WHERE task_id = ?
+                    """,
+                    (task_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "id": row[0],
+                        "task_id": row[1],
+                        "report_id": row[2],
+                        "user_id": row[3],
+                        "analysis_type": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6]
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Error getting mapping by task ID: {str(e)}")
+            raise
+    
+    def get_mapping_by_report_id(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """Get mapping by report ID"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT id, task_id, report_id, user_id, analysis_type, created_at, updated_at
+                    FROM task_report_mappings 
+                    WHERE report_id = ?
+                    """,
+                    (report_id,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "id": row[0],
+                        "task_id": row[1],
+                        "report_id": row[2],
+                        "user_id": row[3],
+                        "analysis_type": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6]
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Error getting mapping by report ID: {str(e)}")
+            raise
+    
+    def get_user_mappings(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get task-report mappings for a user"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT id, task_id, report_id, user_id, analysis_type, created_at, updated_at
+                    FROM task_report_mappings 
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (user_id, limit, offset)
+                )
+                rows = cursor.fetchall()
+                return [
+                    {
+                        "id": row[0],
+                        "task_id": row[1],
+                        "report_id": row[2],
+                        "user_id": row[3],
+                        "analysis_type": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6]
+                    }
+                    for row in rows
+                ]
+        except Exception as e:
+            logger.error(f"Error getting user mappings: {str(e)}")
+            raise
+    
+    def delete_mapping(self, mapping_id: str) -> bool:
+        """Delete task-report mapping"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM task_report_mappings WHERE id = ?",
+                    (mapping_id,)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping: {str(e)}")
+            raise
+    
+    def delete_mapping_by_task_id(self, task_id: str) -> bool:
+        """Delete mapping by task ID"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM task_report_mappings WHERE task_id = ?",
+                    (task_id,)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping by task ID: {str(e)}")
+            raise
+    
+    def delete_mapping_by_report_id(self, report_id: str) -> bool:
+        """Delete mapping by report ID"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM task_report_mappings WHERE report_id = ?",
+                    (report_id,)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error deleting mapping by report ID: {str(e)}")
+            raise
+    
+    def cleanup_old_mappings(self, days_old: int = 30) -> int:
+        """Clean up old mappings and return count of cleaned mappings"""
+        try:
+            with sqlite3.connect(self.db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    DELETE FROM task_report_mappings 
+                    WHERE created_at < datetime('now', '-{} days')
+                    """.format(days_old)
+                )
+                conn.commit()
+                return cursor.rowcount
+        except Exception as e:
+            logger.error(f"Error cleaning up old mappings: {str(e)}")
             raise
