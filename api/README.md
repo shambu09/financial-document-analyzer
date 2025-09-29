@@ -491,8 +491,6 @@ docker-compose up -d
 
 #### Performance Optimization
 - **Connection Pooling**: Database connection management
-- **Caching**: Redis integration for session caching
-- **Background Processing**: Queue-based processing
 - **Resource Management**: CPU and memory optimization
 
 #### Monitoring & Observability
