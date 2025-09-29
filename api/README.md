@@ -1,16 +1,69 @@
 # Financial Document Analyzer - System Design
 
 ## Table of Contents
-1. [Project Overview](#project-overview)
-2. [System Architecture](#system-architecture)
-3. [Backend API Features](#backend-api-features)
-4. [Database Design](#database-design)
-5. [AI-Powered Analysis Engine](#ai-powered-analysis-engine)
-6. [Security & Authentication](#security--authentication)
-7. [Key Architectural Decisions](#key-architectural-decisions)
-8. [Technology Stack](#technology-stack)
-9. [Deployment & Scalability](#deployment--scalability)
-10. [API Documentation](#api-documentation)
+1. [Quick Start](#quick-start)
+2. [Project Overview](#project-overview)
+3. [System Architecture](#system-architecture)
+4. [Backend API Features](#backend-api-features)
+5. [Database Design](#database-design)
+6. [AI-Powered Analysis Engine](#ai-powered-analysis-engine)
+7. [Security & Authentication](#security--authentication)
+8. [Key Architectural Decisions](#key-architectural-decisions)
+9. [Technology Stack](#technology-stack)
+10. [Deployment & Scalability](#deployment--scalability)
+11. [API Documentation](#api-documentation)
+
+## Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- OpenAI API Key
+
+### 1. Environment Setup
+```bash
+# Copy environment template
+cp env.example .env
+
+# Edit .env file with your configuration
+# Required: OPENAI_API_KEY, MONGODB_CONNECTION_STRING
+```
+
+### 2. Start Services
+```bash
+# Start all services (API, Database, Redis, Celery)
+docker-compose up -d
+
+# Check service status
+docker-compose ps
+```
+
+### 3. Access the API
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Task Monitor**: http://localhost:5555
+- **Database UI**: http://localhost:8081
+
+### 4. Test the API
+```bash
+# Register a user
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "email": "test@example.com", "password": "testpass123"}'
+
+# Login
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "testpass123"}'
+```
+
+### 5. Upload and Analyze Documents
+```bash
+# Upload a document for analysis
+curl -X POST "http://localhost:8000/analysis/comprehensive" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@your_document.pdf" \
+  -F "query=Analyze this financial document"
+```
 
 ## Project Overview
 
@@ -624,17 +677,45 @@ task_routes = {
 
 ### Development Environment
 ```bash
-# Local development setup
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+# Using Docker (Recommended)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
 ### Production Deployment
 ```bash
-# Docker deployment
+# Start all services
 docker-compose up -d
+
+# Scale workers if needed
+docker-compose up -d --scale celery-worker=3
+
+# View service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f api
+docker-compose logs -f celery-worker
+```
+
+### Service Management
+```bash
+# Restart specific service
+docker-compose restart api
+
+# View logs for specific service
+docker-compose logs -f celery-worker
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
 ```
 
 ## API Documentation
@@ -671,15 +752,66 @@ docker-compose up -d
 
 ---
 
+## Troubleshooting
+
+### Common Issues
+
+#### Services Not Starting
+```bash
+# Check service status
+docker-compose ps
+
+# View error logs
+docker-compose logs api
+docker-compose logs celery-worker
+```
+
+#### Database Connection Issues
+```bash
+# Check MongoDB logs
+docker-compose logs mongodb
+
+# Restart database
+docker-compose restart mongodb
+```
+
+#### Task Processing Issues
+```bash
+# Check Celery worker logs
+docker-compose logs celery-worker
+
+# Check Redis connection
+docker-compose logs redis
+
+# Restart workers
+docker-compose restart celery-worker
+```
+
+#### Memory Issues
+```bash
+# Scale down workers
+docker-compose up -d --scale celery-worker=1
+
+# Check resource usage
+docker stats
+```
+
+### Environment Variables
+Ensure all required environment variables are set in `.env`:
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `MONGODB_CONNECTION_STRING`: MongoDB connection string
+- `REDIS_URL`: Redis connection URL
+- `JWT_SECRET_KEY`: JWT signing key
+
 ## Conclusion
 
-The Financial Document Analyzer represents a production-ready, enterprise-grade system that combines modern web technologies with advanced AI capabilities. The modular architecture, comprehensive security features, and scalable design make it suitable for both development and production environments.
+The Financial Document Analyzer is a production-ready system that combines modern web technologies with advanced AI capabilities. Key features include:
 
-The system's key strengths include:
-- **Robust Architecture**: Clean separation of concerns with maintainable code
-- **AI Integration**: Sophisticated financial analysis using specialized agents
-- **Security First**: Comprehensive authentication and authorization
-- **Scalability**: Designed for growth and high availability
-- **Developer Experience**: Well-documented APIs with interactive documentation
+- **AI-Powered Analysis**: CrewAI agents for financial document processing
+- **Distributed Processing**: Celery with Redis for scalable task processing
+- **Real-time Monitoring**: Flower dashboard for task monitoring
+- **Multi-Database Support**: SQLite for development, MongoDB for production
+- **Comprehensive Security**: JWT authentication with role-based access control
+- **Developer-Friendly**: Interactive API documentation and clear setup instructions
 
-This design document serves as a comprehensive guide for understanding, maintaining, and extending the Financial Document Analyzer system.
+This system is designed for both development and production environments, with Docker Compose providing easy deployment and management.

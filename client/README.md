@@ -7,7 +7,9 @@ A modern React application for managing financial documents with AI-powered anal
 - **Authentication**: Secure user registration and login with JWT tokens
 - **Document Management**: Upload, view, download, and delete financial documents
 - **AI Analysis**: Multiple analysis types including comprehensive, investment, risk assessment, and verification
+- **Real-time Progress Tracking**: Live progress indicators for analysis tasks with task status monitoring
 - **Report Management**: View and manage analysis reports with filtering and pagination
+- **Task Status Monitoring**: Real-time task status updates with automatic polling
 - **User Profile**: Manage account settings and change passwords
 - **Responsive Design**: Mobile-friendly interface with modern UI components
 
@@ -66,11 +68,14 @@ The application will be available at `http://localhost:5173`.
 src/
 ├── components/          # Reusable UI components
 │   ├── ui/             # shadcn/ui components
-│   └── Layout.tsx      # Main layout component
+│   │   └── progress-indicator.tsx # Progress indicator component
+│   ├── Layout.tsx      # Main layout component
+│   └── ReportCard.tsx  # Report card with progress tracking
 ├── contexts/           # React contexts
 │   └── AuthContext.tsx # Authentication context
 ├── hooks/              # Custom React hooks
-│   └── use-toast.ts    # Toast notification hook
+│   ├── use-toast.ts    # Toast notification hook
+│   └── useTaskStatus.ts # Task status monitoring hook
 ├── lib/                # Utility functions
 │   ├── api.ts          # API client configuration
 │   └── utils.ts        # Utility functions
@@ -96,6 +101,7 @@ The application integrates with a FastAPI backend that provides:
 - **Document Management**: Upload, list, download, and delete documents
 - **Analysis**: AI-powered document analysis with multiple analysis types
 - **Reports**: Generate, list, and manage analysis reports
+- **Task Management**: Real-time task status monitoring and progress tracking
 
 ### API Endpoints
 
@@ -113,6 +119,10 @@ The application integrates with a FastAPI backend that provides:
 - `GET /reports/` - List reports
 - `GET /reports/{id}` - Get specific report
 - `DELETE /reports/{id}` - Delete report
+- `GET /tasks/{id}/status` - Get task status
+- `POST /tasks/{id}/cancel` - Cancel task
+- `GET /tasks/active` - Get active tasks
+- `GET /task-mappings/by-report/{id}` - Get task mapping by report
 
 ## Available Scripts
 
@@ -141,14 +151,29 @@ The application integrates with a FastAPI backend that provides:
   - **Risk Assessment**: Risk evaluation and mitigation strategies
   - **Verification**: Document validation and authenticity
 - Custom query support for specific analysis requirements
-- Real-time progress tracking
+- Real-time progress tracking with visual indicators
+- Task status monitoring (pending, in_progress, completed, failed, retrying, cancelled)
 
 ### Reports
 - View all analysis reports with filtering
 - Search reports by filename, query, or summary
 - Download completed reports
 - Pagination for large datasets
-- Status tracking (pending, completed, failed)
+- Real-time progress indicators for in-progress tasks
+- Task status monitoring with automatic polling (10-second intervals)
+- Visual progress bars with status-specific colors and icons
+- Task information display (task ID, worker, queue, retries)
+
+### Progress Tracking
+- **Real-time Updates**: Live progress indicators that update automatically
+- **Task Status Monitoring**: Automatic polling every 10 seconds for active tasks
+- **Visual Indicators**: 
+  - Progress bars with percentage completion
+  - Status-specific colors (green for completed, blue for in-progress, red for failed)
+  - Animated icons for different states
+- **Task Information**: Display task ID, worker, queue, and retry count
+- **Smart Polling**: Automatically stops polling when tasks complete or fail
+- **Status Labels**: Clear status text (Processing, Retrying, Completed, Failed, etc.)
 
 ### User Profile
 - Update personal information
