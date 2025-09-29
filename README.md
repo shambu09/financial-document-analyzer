@@ -2,7 +2,7 @@
 
 An AI-powered financial document analysis system with real-time task processing and modern web interface.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
@@ -31,7 +31,7 @@ npm run dev
 - **Task Monitor**: http://localhost:5555
 - **Database UI**: http://localhost:8081
 
-## 🏗️ Architecture
+## Architecture
 
 ### Backend (FastAPI + Celery)
 - **API Server**: FastAPI with JWT authentication
@@ -47,7 +47,7 @@ npm run dev
 - **UI Components**: Custom component library
 - **Real-time Updates**: Task status polling
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ├── api/                   # Backend API server
@@ -59,7 +59,7 @@ npm run dev
     └── README.md          # Frontend documentation
 ```
 
-## 🔧 Development
+## Development
 
 ### Backend Development
 ```bash
@@ -77,7 +77,7 @@ npm run dev       # Start development server
 npm run build     # Build for production
 ```
 
-## 📊 Features
+## Features
 
 - **Document Upload**: Support for PDF, TXT, and other formats
 - **AI Analysis**: Comprehensive, investment, risk, and verification analysis
@@ -86,20 +86,20 @@ npm run build     # Build for production
 - **Report Generation**: Downloadable analysis reports
 - **Task Monitoring**: Real-time task queue monitoring
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 **Backend**: FastAPI, Celery, Redis, MongoDB, CrewAI, OpenAI
 **Frontend**: React, TypeScript, Tailwind CSS, React Query
 **DevOps**: Docker, Docker Compose
 
-## 📚 Documentation
+## Documentation
 
 - [API Documentation](./api/README.md) - Complete backend documentation
 - [Frontend Documentation](./client/README.md) - React application guide
 - [Docker Setup](./api/DOCKER_SETUP.md) - Container deployment guide
 - [Celery Setup](./api/CELERY_SETUP.md) - Task processing configuration
 
-## 🔐 Environment Setup
+## Environment Setup
 
 1. Copy `api/env.example` to `api/.env`
 2. Configure your OpenAI API key and database settings
